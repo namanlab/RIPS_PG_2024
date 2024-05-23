@@ -13,13 +13,13 @@ library(LaplacesDemon)
 library(invgamma)
 
 ## settings
-nc <- 25 
-nt <- 50
-n0 <- 50
-sigc <- 1
-sigt <- 1
-sig0 <- 1
-uc <- 1
+nc <- 25 # current control size
+nt <- 50 # current treatment size
+n0 <- 50 # historical control size
+sigc <- 1 # control sd
+sigt <- 1 # treatment sd
+sig0 <- 1 # historical sd
+uc <- 1 # true mean of control
 
 
 #################
@@ -152,70 +152,84 @@ normal_logistic_elastic <- function(a, b, c, n0, x0, nc, uc, sigc, nt, ut, sigt,
 }
 
 
+#########----------------------------------------------------------
 
 
-
+######### scenario: match u0 = uc ##############
+## historical data
+set.seed(8172)
+u0 <- 1 # mean of historical
+x0 <- rnorm(n0, u0, sig0)
 
 ## obtain calibrated a and b in smooth elastic function
 para <- decide_para(c=1, x0, n0, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
 a <- para$a 
 b <- para$b 
 
-######### scenario: match u0 = uc ##############
-## historical data
-set.seed(8172)
-u0 <- 1
-x0 <- rnorm(n0, u0, sig0)
-
 ## type I error
-ut <- 1
+ut <- 1 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
 print(timeend - timestart)
 
 ## power
-ut <- 1.5
+ut <- 1.5 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
 print(timeend - timestart)
+
+#########----------------------------------------------------------
+
 
 ######### scenario: match u0 != uc ##############
 ## historical data
 set.seed(8172)
-u0 <- 1.2
+u0 <- 1.2 # mean of historical
 x0 <- rnorm(n0, u0, sig0)
 
+## obtain calibrated a and b in smooth elastic function
+para <- decide_para(c=1, x0, n0, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
+a <- para$a 
+b <- para$b 
+
 ## type I error
-ut <- 1
+ut <- 1 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
 print(timeend - timestart)
 
 ## power
-ut <- 1.5
+ut <- 1.5 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
 print(timeend - timestart)
+
+#########----------------------------------------------------------
 
 ######### scenario: match u0 != uc ##############
 ## historical data
 set.seed(8172)
-u0 <- 1.5
+u0 <- 1.5 # mean of historical
 x0 <- rnorm(n0, u0, sig0)
 
+## obtain calibrated a and b in smooth elastic function
+para <- decide_para(c=1, x0, n0, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
+a <- para$a 
+b <- para$b 
+
 ## type I error
-ut <- 1
+ut <- 1 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
 print(timeend - timestart)
 
 ## power
-ut <- 1.5
+ut <- 1.5 # true mean of treatment
 timestart <- Sys.time()
 normal_logistic_elastic(a, b, c=1, n0, x0, nc, uc, sigc, nt, ut, sigt, cutoff=0.918, ntrial=100)
 timeend <- Sys.time()
