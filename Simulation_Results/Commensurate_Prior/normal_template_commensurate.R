@@ -1,5 +1,5 @@
 #################
-################# EP1 with smooth elastic function #######################
+################# EP1 with commensurate power prior #######################
 #################
 
 library(MCMCpack)
@@ -22,9 +22,9 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   width_quantile_interval <- NULL # width of credible interval
   point_est <- NULL # point estimator based on control prior
   xc_act <- NULL # actual control samples
-  xc_samp <- NULL # samples based on prosterior predictive
+  xc_samp <- NULL # samples based on posterior predictive
   
-  # any params for models to be computed a-priori -- TO CHANGE DEPENIDNG ON METHOD
+  # any params for models to be computed a-priori -- TO CHANGE DEPENDING ON METHOD
   params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
   
   for(trial in 1:R){
@@ -34,7 +34,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     xc <- rnorm(nc, uc, sigc)
     xt <- rnorm(nt, ut, sigt)
     
-    # posterior for control arm -- TO CHANGE DEPENIDNG ON METHOD
+    # posterior for control arm -- TO CHANGE DEPENDING ON METHOD
     res_inter <- get_control_prost(params, xc, xh, nc, nh, H, N)
     muc <- res_inter$prost_samples
     
@@ -81,7 +81,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   cat("MSE of point estiamtor based on control prior", formatC(mse_point_est, digits = 4, format = "f"), sep = " ", "\n")
   cat("total time for", R, "simulations is", formatC(timeend - timestart, digits = 4, format = "f"), sep = " ", "\n")
   plot_comp <- ggplot(data = tibble("Control Distribution" = xc_act, "Prost Predictive" = xc_samp) %>% 
-           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
+                        pivot_longer(1:2, names_to = "type", values_to = "val") ) +
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue"))
   return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
@@ -93,35 +93,70 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 
 
 get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
-  list(a0 = 0.5)
+  list()
 }
 
-# Function to perform MCMC sampling for the posterior using power prior
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
-  a0 <- params$a0
   
-  # Define the posterior distribution for control arm using power prior
+  # Define the prior distribution for a0
+  log_prior_a0 <- function(a0) {
+    dnorm(a0, mean = 0.5, sd = 0.1, log = TRUE)
+  }
+  
+  # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
-    # theta = (mu, log(sigma))
+    # Extracting parameters
     mu <- theta[1]
     sigma <- exp(theta[2])
+    a0 <- theta[3]  # New parameter for the commensurate power prior
+    
+    # Likelihood
     log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
-    log_lik_hist <- a0 * sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, mu, sigma, log = TRUE))
+    
+    # Prior distributions
     log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
     log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
-    log_post <- log_lik_current + log_lik_hist + log_prior_mu + log_prior_sigma
+    log_prior_a0 <- log_prior_a0(a0)  # Prior distribution for a0
+    
+    # Computing the commensurate factor
+    commensurate_factor <- exp(-0.5 * (mean(xc) - mean(xh))^2 / (sigma^2 / nh + sigma^2 / nc))
+    
+    # Posterior
+    log_post <- log_lik_current + a0 * commensurate_factor * log_lik_hist + log_prior_mu + log_prior_sigma + log_prior_a0
     return(log_post)
   }
-  init_values <- c(mean(xc), log(sd(xc)))
+  
+  init_values <- c(mean(xc), log(sd(xc)), 0.5)  # Initial values for MCMC sampling
   # Perform MCMC sampling
   samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
   
-  # Extract posterior samples for mu and sigma
+  # Extract posterior samples for mu, sigma, and a0
   mu_samples <- samples[, 1]
   sigma_samples <- exp(samples[, 2])
-  ess <- var(xh)/var(mu_samples)
-  list(prost_samples = mu_samples, ess = ess)
+  a0_samples <- samples[, 3]
+  
+  # log prior for ess:
+  log_prior <- function(theta) {
+    mu <- theta[1]
+    sigma <- exp(theta[2])
+    log_lik_hist <- sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
+    log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
+    log_prior_a0 <- log_prior_a0(theta[3])  # Prior distribution for a0
+    log_post <- log_lik_hist + log_prior_mu + log_prior_sigma + log_prior_a0
+    return(log_post)
+  }
+  
+  # Perform MCMC sampling for the prior of a0
+  init_values <- 0.5  # Initial value for a0
+  samples_prior <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  a0_samples_prior <- samples_prior
+  
+  ess <- var(xh) / var(mu_samples)
+  list(prost_samples = mu_samples, ess = ess, a0_samples = a0_samples, a0_samples_prior = a0_samples_prior)
 }
+
 
 #########--------------------------------------------------------------#########
 ############################ NO CHANGE TO BE MADE  #############################
@@ -159,6 +194,6 @@ res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_elastic_prior_normal.rds")
+saveRDS(results, file = "simulation_results_commensurate_prior_normal.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")
