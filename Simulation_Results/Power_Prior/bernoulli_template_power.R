@@ -92,92 +92,56 @@ run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
 
 # can return a list of all params if needed to be used by model, return null if not needed
 get_params <- function(xh, nt, nc, nh, pc, pt, ph, H, N, R){
-  params <- decide_para(c=1, xh, nh, nc, gamma=0.24, q1=0.9, q2=0.1, small = 0.01, large = 0.99, R = 50000)
+  params <- list()
   params$t_alpha = 0.1
   params$t_beta = 0.1
   params$c_alpha = 0.1
   params$c_beta = 0.1
+  params$a0 = 0.5
   return(params)
 }
 
-# returns a list of:
-# i) prost_samples: N samples from prosterior distribution
-# ii) ess: effective sample size for the prior used
-get_control_prost <- function(params, xc, xh, nc, nh, H, N){
-  a <- params$a 
-  b <- params$b 
-  c <- params$c
-  c_alpha <- params$c_alpha
-  c_beta <- params$c_beta
-  # calculate g(t)
-  phat <- (xh + xc)/(nh + nc)
-  O <- cbind(c(xh, xc), c(nh-xh, nc-xc))
-  E <- cbind(c(nh, nc) * phat, c(nh, nc) * (1 - phat))
-  cong_measure <- max(nh, nc)^(-1/4)*sum((O - E)^2/E)
-  gt <- 1/(1+exp(a + b*(log(cong_measure))^c))
-  if(gt < 0.01) gt <- 0.01 # numerical stability
-  # posterior for control arm
-  c_pa1 <- (c_alpha + xh)*gt + xc
-  c_pa2 <- (c_beta + nh - xh)*gt + nc - xc
-  pc_post <- rbeta(N, c_pa1, c_pa2)
-  res <- list(ess = gt*nh, prost_samples = pc_post)
-  return(res)
-}
 
-
-
-#-----Function to decide tuning parameter a and b in logistic elastic function------------#
-# Inputs:
-# c: pre-specified tuning parameter controlling the shape of elastic function. Here, we fix it by 1
-# x0: historical data
-# n0: sample size for historical data
-# nc: sample size for control arm
-# gamma: clinically highly meaningful difference,  -- 
-# q1: q1th percentile of congruence measure T in the homogeneous case, 0.95 --
-# q2: q2th percentile of congruence measure T in the heterogeneous case, 0.02 --
-# small: value of elastic function in the heterogeneous case, 0.01 --
-# large: value of elastic function in the homogeneous case, 0.99 --
-# R: the number of simulations
-# 
-# Outputs:
-# a: tuning parameter in elastic function 
-# b: tuning parameter in elastic function)
-decide_para <- function(x0, n0, nc, gamma, q1, q2, c, small, large, R=50000){
-  set.seed(10)
-  p0 <- x0/n0
-  if(p0-gamma<0){
-    p <- c(p0, p0 + gamma)
-  }else if(p0 + gamma>1){
-    p <- c(p0, p0 - gamma)
-  }else{
-    p <- c(p0, p0 - gamma, p0 + gamma)
+# Function to perform MCMC sampling for the posterior using power prior
+get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
+  a0 <- params$a0
+  
+  # Define the posterior distribution for control arm using power prior
+  log_posterior <- function(theta) {
+    # theta = (logit(p))
+    logit_p <- theta[1]
+    p <- exp(logit_p) / (1 + exp(logit_p))
+    log_lik_current <- dbinom(xc, nc, p, log = TRUE)
+    log_lik_hist <- a0 * dbinom(xh, nh, p, log = TRUE)
+    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
+    log_post <- log_lik_current + log_lik_hist + log_prior_p
+    return(log_post)
   }
-  K <- matrix(NA, R, length(p))
-  for (i in 1:R) {
-    for (j in 1:length(p)) {
-      y <- rbinom(1, nc, p[j])
-      phat <- (x0 + y)/(n0 + nc)
-      obs <- cbind(c(x0, y), c(n0-x0, nc-y))
-      exc <- cbind(c(n0, nc)*phat, c(n0, nc)*(1-phat))
-      Ka <- max(n0, nc)^(-1/4)*sum((obs-exc)^2/exc)
-      K[i,j] <- Ka
-    }
+  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))))
+  # Perform MCMC sampling
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  
+  # Extract posterior samples for p
+  logit_p_samples <- samples[, 1]
+  p_samples <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
+  
+  # log prior for ess:
+  log_prior <- function(theta) {
+    logit_p <- theta[1]
+    p <- exp(logit_p) / (1 + exp(logit_p))
+    log_lik_hist <- a0 * dbinom(xh, nh, p, log = TRUE)
+    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
+    log_post <- log_lik_hist + log_prior_p
+    return(log_post)
   }
-  if(length(p)==2){
-    quant1 <- quantile(K[,1], probs = q1)
-    quant2 <- quantile(K[,2], probs = q2)
-    K_homo <- quant1
-    K_hete <- quant2
-  }else{
-    quant1 <- quantile(K[,1], probs = q1)
-    quant2 <- quantile(K[,2], probs = q2)
-    quant3 <- quantile(K[,3], probs = q2)
-    K_homo <- quant1
-    K_hete <- min(quant2, quant3)
-  }
-  b <- log((1-large)*small/((1-small)*large))/((log(K_homo))^c-(log(K_hete))^c)
-  a <- log((1-large)/large)-b*(log(K_homo))^c
-  return(list(a=a, b=b, c = c))
+  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))))
+  # Perform MCMC sampling
+  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  logit_p_samples <- samples[, 1]
+  p_samples_prior <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
+  ess <- (params$c_alpha + xh)*(params$c_beta + nh - xh)/(var(p_samples_prior)*(params$c_alpha + params$c_beta + nh)^2*(params$c_alpha + params$c_beta + nh + 1))*nh
+  print(ess)
+  list(prost_samples = p_samples, ess = ess)
 }
 
 #########--------------------------------------------------------------#########

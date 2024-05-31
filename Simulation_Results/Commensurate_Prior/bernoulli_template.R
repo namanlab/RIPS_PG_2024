@@ -6,12 +6,12 @@ library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
-library(RBesT)
+# ADD ANY OTHER PACKAGES
 
-run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
+run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
   
-  set.seed(42)
-  xh <- rnorm(nh, uh, sigh) # historical data
+  set.seed(10)
+  xh <- rbinom(1, nh, ph) # historical data
   
   # Metrics to calculate
   rej_null <- 0 # number of rejections
@@ -23,28 +23,26 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   xc_act <- NULL # actual control samples
   xc_samp <- NULL # samples based on prosterior predictive
   
-  # any params for models to be computed a-priori -- TO CHANGE DEPENIDNG ON METHOD
-  params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
+  # any params for models to be computed a-priori -- TO CHANGE DEPENDING ON METHOD
+  params <- get_params(xh, nt, nc, nh, pc, pt, ph, H, N, R)
   
   for(trial in 1:R){
     
     set.seed(100 + trial)
     # generate control and treatment data
-    xc <- rnorm(nc, uc, sigc)
-    xt <- rnorm(nt, ut, sigt)
+    xc <- rbinom(1, nc, pc)
+    xt <- rbinom(1, nt, pt)
     
     # posterior for control arm -- TO CHANGE DEPENIDNG ON METHOD
     res_inter <- get_control_prost(params, xc, xh, nc, nh, H, N)
-    muc <- res_inter$prost_samples
+    pc_post <- res_inter$prost_samples
     
     # posterior for treatment arm
-    t.par1 <- mean(xt)
-    t.par2 <- var(xt)/nt
-    mut <- rst(N, t.par1, sqrt(t.par2), nt - 1)
+    pt_post <- rbeta(N, params$t_alpha + xt, params$t_beta + nt - xt)
     
     # METRICS:
     # probability that treatment is superior to control
-    pp <- mean(mut > muc)
+    pp <- mean(pt_post > pc_post)
     # number of rejections of null
     if(pp >= cutoff){
       rej_null <- rej_null + 1
@@ -52,16 +50,16 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     # effective sample size:
     ess <- c(ess, res_inter$ess)
     # Count if the true value is within the quantile interval
-    quantile_interval <- quantile(muc, probs = c(0.025, 0.975))
-    quantile_interval_count <- quantile_interval_count + ifelse((quantile_interval[1] <= uc) && (quantile_interval[2] >= uc), 1, 0)
+    quantile_interval <- quantile(pc_post, probs = c(0.025, 0.975))
+    quantile_interval_count <- quantile_interval_count + ifelse((quantile_interval[1] <= pc) && (quantile_interval[2] >= pc), 1, 0)
     # Width of the quantile interval
     width_quantile_interval <- c(width_quantile_interval, quantile_interval[2] - quantile_interval[1])
     # point estimator
-    val_point_est <- mean(muc)
+    val_point_est <- mean(pc_post)
     point_est <- c(point_est, val_point_est)
     # posterior predictive check:
-    xc_act <- c(xc_act, rnorm(length(muc), uc, sigc))
-    xc_samp <- c(xc_samp, rnorm(length(muc), muc, sigc))
+    xc_act <- c(xc_act, rbinom(length(pc_post), nc, pc))
+    xc_samp <- c(xc_samp, rbinom(length(pc_post), nc, pc_post))
   }
   timeend <- Sys.time()
   EHSS <- mean(ess)
@@ -79,10 +77,11 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   cat("Variance value of point estiamtor based on control prior", formatC(var_point_est, digits = 4, format = "f"), sep = " ", "\n")
   cat("MSE of point estiamtor based on control prior", formatC(mse_point_est, digits = 4, format = "f"), sep = " ", "\n")
   cat("total time for", R, "simulations is", formatC(timeend - timestart, digits = 4, format = "f"), sep = " ", "\n")
-  plot_comp <- ggplot(data = tibble("Control Distribution" = xc_act, "Prost Predictive" = xc_samp) %>% 
-           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
-    geom_density(aes(x = val, fill = type), alpha = 0.3) +
-    theme_bw() + scale_fill_manual(values = c("yellow", "blue"))
+  plot_comp <- ggplot(data = tibble("Control Distribution" = xc_act, 
+                                    "Prost Predictive" = xc_samp) %>% 
+                        pivot_longer(1:2, names_to = "type", values_to = "val") ) +
+    geom_histogram(aes(x = val, y = after_stat(density), fill = type), alpha = 0.7, binwidth = 1) +
+    theme_bw() + scale_fill_manual(values = c("red", "blue"))
   return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
               quantile_interval_count_mean = quantile_interval_count_mean,
               bias_point_est = bias_point_est, var_point_est = var_point_est, mse_point_est = mse_point_est,
@@ -92,8 +91,12 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 
 
 # can return a list of all params if needed to be used by model, return null if not needed
-get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R){
-  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
+get_params <- function(xh, nt, nc, nh, pc, pt, ph, H, N, R){
+  params <- decide_para(c=1, xh, nh, nc, gamma=0.24, q1=0.9, q2=0.1, small = 0.01, large = 0.99, R = 50000)
+  params$t_alpha = 0.1
+  params$t_beta = 0.1
+  params$c_alpha = 0.1
+  params$c_beta = 0.1
   return(params)
 }
 
@@ -104,14 +107,20 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N){
   a <- params$a 
   b <- params$b 
   c <- params$c
-  # calculate statistic and g(t)
-  sp <- ((nh-1)*var(xh) + (nc-1)*var(xc))/(nh + nc - 2) # pooled variance
-  cong_measure <- max(nh, nc)^(-1/4)*abs(mean(xh)-mean(xc))/(sqrt(sp/nh + sp/nc))
-  gt <- 1/(1 + exp(a + b*(log(cong_measure))^c))
-  if(gt == 0) gt <- 0.00001 # numerical stability
+  c_alpha <- params$c_alpha
+  c_beta <- params$c_beta
+  # calculate g(t)
+  phat <- (xh + xc)/(nh + nc)
+  O <- cbind(c(xh, xc), c(nh-xh, nc-xc))
+  E <- cbind(c(nh, nc) * phat, c(nh, nc) * (1 - phat))
+  cong_measure <- max(nh, nc)^(-1/4)*sum((O - E)^2/E)
+  gt <- 1/(1+exp(a + b*(log(cong_measure))^c))
+  if(gt < 0.01) gt <- 0.01 # numerical stability
   # posterior for control arm
-  temp <- sample_poster(xh, nh, xc, nc, gt, sim = N + 10000, nburn=10000)
-  res <- list(ess = gt*nh, prost_samples = temp$muc_post) # 
+  c_pa1 <- (c_alpha + xh)*gt + xc
+  c_pa2 <- (c_beta + nh - xh)*gt + nc - xc
+  pc_post <- rbeta(N, c_pa1, c_pa2)
+  res <- list(ess = gt*nh, prost_samples = pc_post)
   return(res)
 }
 
@@ -132,61 +141,43 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N){
 # 
 # Outputs:
 # a: tuning parameter in elastic function 
-# b: tuning parameter in elastic function
-decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
-  set.seed(1)
-  u0 <- mean(x0)
-  sig0 <- sd(x0)
-  mc <- c(u0, u0 + gamma,  u0 - gamma)
-  t <- matrix(NA, R, length(mc))
+# b: tuning parameter in elastic function)
+decide_para <- function(x0, n0, nc, gamma, q1, q2, c, small, large, R=50000){
+  set.seed(10)
+  p0 <- x0/n0
+  if(p0-gamma<0){
+    p <- c(p0, p0 + gamma)
+  }else if(p0 + gamma>1){
+    p <- c(p0, p0 - gamma)
+  }else{
+    p <- c(p0, p0 - gamma, p0 + gamma)
+  }
+  K <- matrix(NA, R, length(p))
   for (i in 1:R) {
-    for (j in 1:length(mc)) {
-      xc <- rnorm(nc, mc[j], sig0)
-      sp <- ((n0-1)*sig0^2 + (nc-1)*var(xc))/(n0 + nc - 2) # pooled variance
-      t[i,j] <- max(n0, nc)^(-1/4)*abs(u0-mean(xc))/(sqrt(sp/n0 + sp/nc))
+    for (j in 1:length(p)) {
+      y <- rbinom(1, nc, p[j])
+      phat <- (x0 + y)/(n0 + nc)
+      obs <- cbind(c(x0, y), c(n0-x0, nc-y))
+      exc <- cbind(c(n0, nc)*phat, c(n0, nc)*(1-phat))
+      Ka <- max(n0, nc)^(-1/4)*sum((obs-exc)^2/exc)
+      K[i,j] <- Ka
     }
   }
-  quant1 <- quantile(t[,1], q1)
-  quant2 <- quantile(t[,2], q2)
-  quant3 <- quantile(t[,3], q2)
-  KS_homo <- quant1
-  KS_hete <- min(quant2, quant3)
-  b <- log((1-large)*small/((1-small)*large))/((log(KS_homo))^c-(log(KS_hete))^c)
-  a <- log((1-large)/large)-b*(log(KS_homo))^c
-  return(list(a=a, b=b, c=c))
-}
-
-#-----Function to sample posterior of mean value for control arm------------#
-# Inputs:
-# x0: historical data
-# n0: sample size for historical data
-# xc: control data
-# nc: sample size for control arm
-# gt: value of elastic function at current congruence measure t between historical and control data
-# sim: number of simulated trial
-# nburn: number of simulated trial in burn-in process
-# 
-# Outputs:
-# muc_post: posterior of mean value for control arm
-sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000){
-  muc_post <- numeric(sim-nburn)
-  muc_ini <- mean(xc)
-  muc <- muc_ini
-  for (s in 1:sim) {
-    # sample control variance from posterior
-    alpha <- (1 + nc)/2
-    beta <- nc*(var(xc) + (mean(xc) - muc)^2)/2
-    sig <- rinvgamma(1, alpha, beta)
-    # sample mean from posterior
-    D <- var(x0)/(n0*gt)
-    mu <- (nc*mean(xc)*D + sig*mean(x0))/(nc*D + sig)
-    var <- sig*D/(D*nc + sig)
-    muc <- rnorm(1, mu, sqrt(var)) 
-    if(s > nburn){
-      muc_post[s-nburn] <- muc
-    }
+  if(length(p)==2){
+    quant1 <- quantile(K[,1], probs = q1)
+    quant2 <- quantile(K[,2], probs = q2)
+    K_homo <- quant1
+    K_hete <- quant2
+  }else{
+    quant1 <- quantile(K[,1], probs = q1)
+    quant2 <- quantile(K[,2], probs = q2)
+    quant3 <- quantile(K[,3], probs = q2)
+    K_homo <- quant1
+    K_hete <- min(quant2, quant3)
   }
-  return(list(muc_post=muc_post))
+  b <- log((1-large)*small/((1-small)*large))/((log(K_homo))^c-(log(K_hete))^c)
+  a <- log((1-large)/large)-b*(log(K_homo))^c
+  return(list(a=a, b=b, c = c))
 }
 
 #########--------------------------------------------------------------#########
@@ -195,36 +186,32 @@ sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000){
 
 
 
-
 ## settings
 nc <- 25 # current control size
 nt <- 50 # current treatment size
 nh <- 50 # historical control size
-sigc <- 1 # control sd
-sigt <- 1 # treatment sd
-sigh <- 1 # historical sd
-uc <- 1 # true mean of control
+pc <- 0.4 # true mean of control
 
 # strong congruence between control and historical
-res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
+res1 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.4, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res1$plot_comp
-res2 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
+res2 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.4, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res2$plot_comp
 
 # weak congruence between control and historical
-res3 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
+res3 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.45, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res3$plot_comp
-res4 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
+res4 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.45, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res4$plot_comp
 
 # no congruence between control and historical
-res5 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
+res5 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.6, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res5$plot_comp
-res6 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
+res6 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.6, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_elastic_prior_normal.rds")
+saveRDS(results, file = "simulation_results_elastic_prior_bernoulli.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")

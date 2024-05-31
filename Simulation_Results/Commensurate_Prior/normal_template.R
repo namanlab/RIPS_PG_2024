@@ -2,11 +2,12 @@
 ################# EP1 with smooth elastic function #######################
 #################
 
+library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
-library(RBesT)
+# ADD ANY OTHER PACKAGES
 
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
@@ -91,102 +92,35 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 }
 
 
-# can return a list of all params if needed to be used by model, return null if not needed
-get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R){
-  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
-  return(params)
+get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
+  list(a0 = 0.5)
 }
 
-# returns a list of:
-# i) prost_samples: N samples from prosterior distribution
-# ii) ess: effective sample size for the prior used
-get_control_prost <- function(params, xc, xh, nc, nh, H, N){
-  a <- params$a 
-  b <- params$b 
-  c <- params$c
-  # calculate statistic and g(t)
-  sp <- ((nh-1)*var(xh) + (nc-1)*var(xc))/(nh + nc - 2) # pooled variance
-  cong_measure <- max(nh, nc)^(-1/4)*abs(mean(xh)-mean(xc))/(sqrt(sp/nh + sp/nc))
-  gt <- 1/(1 + exp(a + b*(log(cong_measure))^c))
-  if(gt == 0) gt <- 0.00001 # numerical stability
-  # posterior for control arm
-  temp <- sample_poster(xh, nh, xc, nc, gt, sim = N + 10000, nburn=10000)
-  res <- list(ess = gt*nh, prost_samples = temp$muc_post) # 
-  return(res)
-}
-
-
-
-#-----Function to decide tuning parameter a and b in logistic elastic function------------#
-# Inputs:
-# c: pre-specified tuning parameter controlling the shape of elastic function. Here, we fix it by 1
-# x0: historical data
-# n0: sample size for historical data
-# nc: sample size for control arm
-# gamma: clinically highly meaningful difference,  -- 
-# q1: q1th percentile of congruence measure T in the homogeneous case, 0.95 --
-# q2: q2th percentile of congruence measure T in the heterogeneous case, 0.02 --
-# small: value of elastic function in the heterogeneous case, 0.01 --
-# large: value of elastic function in the homogeneous case, 0.99 --
-# R: the number of simulations
-# 
-# Outputs:
-# a: tuning parameter in elastic function 
-# b: tuning parameter in elastic function
-decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
-  set.seed(1)
-  u0 <- mean(x0)
-  sig0 <- sd(x0)
-  mc <- c(u0, u0 + gamma,  u0 - gamma)
-  t <- matrix(NA, R, length(mc))
-  for (i in 1:R) {
-    for (j in 1:length(mc)) {
-      xc <- rnorm(nc, mc[j], sig0)
-      sp <- ((n0-1)*sig0^2 + (nc-1)*var(xc))/(n0 + nc - 2) # pooled variance
-      t[i,j] <- max(n0, nc)^(-1/4)*abs(u0-mean(xc))/(sqrt(sp/n0 + sp/nc))
-    }
+# Function to perform MCMC sampling for the posterior using power prior
+get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
+  a0 <- params$a0
+  
+  # Define the posterior distribution for control arm using power prior
+  log_posterior <- function(theta) {
+    # theta = (mu, log(sigma))
+    mu <- theta[1]
+    sigma <- exp(theta[2])
+    log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
+    log_lik_hist <- a0 * sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
+    log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
+    log_post <- log_lik_current + log_lik_hist + log_prior_mu + log_prior_sigma
+    return(log_post)
   }
-  quant1 <- quantile(t[,1], q1)
-  quant2 <- quantile(t[,2], q2)
-  quant3 <- quantile(t[,3], q2)
-  KS_homo <- quant1
-  KS_hete <- min(quant2, quant3)
-  b <- log((1-large)*small/((1-small)*large))/((log(KS_homo))^c-(log(KS_hete))^c)
-  a <- log((1-large)/large)-b*(log(KS_homo))^c
-  return(list(a=a, b=b, c=c))
-}
-
-#-----Function to sample posterior of mean value for control arm------------#
-# Inputs:
-# x0: historical data
-# n0: sample size for historical data
-# xc: control data
-# nc: sample size for control arm
-# gt: value of elastic function at current congruence measure t between historical and control data
-# sim: number of simulated trial
-# nburn: number of simulated trial in burn-in process
-# 
-# Outputs:
-# muc_post: posterior of mean value for control arm
-sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000){
-  muc_post <- numeric(sim-nburn)
-  muc_ini <- mean(xc)
-  muc <- muc_ini
-  for (s in 1:sim) {
-    # sample control variance from posterior
-    alpha <- (1 + nc)/2
-    beta <- nc*(var(xc) + (mean(xc) - muc)^2)/2
-    sig <- rinvgamma(1, alpha, beta)
-    # sample mean from posterior
-    D <- var(x0)/(n0*gt)
-    mu <- (nc*mean(xc)*D + sig*mean(x0))/(nc*D + sig)
-    var <- sig*D/(D*nc + sig)
-    muc <- rnorm(1, mu, sqrt(var)) 
-    if(s > nburn){
-      muc_post[s-nburn] <- muc
-    }
-  }
-  return(list(muc_post=muc_post))
+  init_values <- c(mean(xc), log(sd(xc)))
+  # Perform MCMC sampling
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  
+  # Extract posterior samples for mu and sigma
+  mu_samples <- samples[, 1]
+  sigma_samples <- exp(samples[, 2])
+  ess <- var(xh)/var(mu_samples)
+  list(prost_samples = mu_samples, ess = ess)
 }
 
 #########--------------------------------------------------------------#########
