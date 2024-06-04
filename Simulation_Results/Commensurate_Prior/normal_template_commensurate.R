@@ -108,7 +108,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
   # Define the prior distribution for tau
   log_prior_tau <- function(tau) {
-    dcauchy(tau, 0, 30)
+    log(dcauchy(log(tau), 0, 30)) - log(tau)
   }
   
   # Logit and inverse logit functions
