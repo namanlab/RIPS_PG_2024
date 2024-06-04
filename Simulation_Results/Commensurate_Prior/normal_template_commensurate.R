@@ -101,14 +101,14 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Define the prior distribution for a0 depending on tau
   log_prior_a0 <- function(a0, tau) {
     g_tau <- function(tau) {
-      return(tau^2)
+      return(max(tau, 1))
     }
     return((g_tau(tau) - 1) * log(a0))
   }
   
   # Define the prior distribution for tau
   log_prior_tau <- function(tau) {
-    return(dgamma(tau, shape = 1, rate = 1, log = TRUE))  # Example prior: Gamma(1, 1)
+    dcauchy(tau, 0, 30)
   }
   
   # Logit and inverse logit functions
@@ -118,28 +118,28 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
     mu <- theta[1]
-    sigma <- exp(theta[2])
+    sigma2 <- exp(theta[2])
     a0 <- inv_logit(theta[3])
     theta0 <- theta[4]
     tau <- exp(theta[5])
     
     # Likelihood
-    log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
-    log_lik_hist <- sum(dnorm(xh, theta0, sigma, log = TRUE))
+    log_lik_current <- sum(dnorm(xc, mu, sqrt(sigma2), log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, theta0, sqrt(sigma2), log = TRUE))
     
     # Prior distributions
     log_prior_tau_val <- log_prior_tau(tau)
     log_prior_a0_val <- log_prior_a0(a0, tau)
-    log_prior_sigma <- -sigma
+    log_prior_sigma2 <- -sigma2
     
     # Commensurate prior for θ
     log_prior_mu <- -0.5 * tau * (mu - theta0)^2
     
-    integ_log <- -a0/(2*sigma^2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma^2) - log(sigma/sqrt(nh*a0))
-    jacob_log <- log(sigma^2) + log(a0*(1 - a0)) + log(tau)
+    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
+    jacob_log <- log(sigma2) + log(a0*(1 - a0)) + log(tau)
     
     # Posterior
-    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma - integ_log + jacob_log
+    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma2 - integ_log + jacob_log
 
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
@@ -150,27 +150,27 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Define the prior distribution for control arm using historical data only
   log_prior_only <- function(theta) {
     mu <- theta[1]
-    sigma <- exp(theta[2])
+    sigma2 <- exp(theta[2])
     a0 <- inv_logit(theta[3])
     theta0 <- theta[4]
     tau <- exp(theta[5])
     
     # Likelihood
-    log_lik_hist <- sum(dnorm(xh, theta0, sigma, log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, theta0, sqrt(sigma2), log = TRUE))
     
     # Prior distributions
     log_prior_tau_val <- log_prior_tau(tau)
     log_prior_a0_val <- log_prior_a0(a0, tau)
-    log_prior_sigma <- -sigma
+    log_prior_sigma2 <- -sigma2
     
     # Commensurate prior for θ
     log_prior_mu <- -0.5 * tau * (mu - theta0)^2
     
-    integ_log <- -a0/(2*sigma^2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma^2) - log(sigma/sqrt(nh*a0))
-    jacob_log <- log(sigma^2) + log(a0*(1 - a0)) + log(tau)
+    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
+    jacob_log <- log(sigma2) + log(a0*(1 - a0)) + log(tau)
     
     # Posterior
-    log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma - integ_log + jacob_log
+    log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma2 - integ_log + jacob_log
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
@@ -178,11 +178,10 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     return(log_post)
   }
   
-  init_values <- c(mean(xc), log(sd(xc)), logit(0.5), mean(xh), 1)  # Initial values for MCMC sampling
+  init_values <- c(mean(xc), log(sd(xc)), logit(0.5), mean(xh), log(1))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
-                          mcmc = N, burnin = 1000, thin = 1, force.samp = T,
-                          optim.method = "Nelder-Mead")
+                          mcmc = N, burnin = 1000, thin = 1, force.samp = T)
   
   # Extract posterior samples for mu, sigma, a0, theta0, and tau
   mu_samples <- samples[, 1]
