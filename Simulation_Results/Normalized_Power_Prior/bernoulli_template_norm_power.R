@@ -2,6 +2,7 @@
 ################# EP1 with smooth elastic function #######################
 #################
 
+library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
@@ -176,8 +177,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
   logit_p_samples <- samples[, 1]
   p_samples_prior <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
-  ess <- (params$c_alpha + xh)*(params$c_beta + nh - xh)/(var(p_samples_prior)*(params$c_alpha + params$c_beta + nh)^2*(params$c_alpha + params$c_beta + nh + 1))*nh
-  print(ess)
+  ess <- mean(xh/nh)*(1 - mean(xh/nh))/(var(p_samples_prior))
   list(prost_samples = p_samples, ess = ess)
 }
 

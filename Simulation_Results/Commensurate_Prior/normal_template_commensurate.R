@@ -202,7 +202,6 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
   # Calculate effective sample size (ESS) based on prior only
   ess_prior <- var(xh) / var(mu_samples_prior)
-  
   list(prost_samples = mu_samples, ess = ess, ess_prior = ess_prior, a0_samples = a0_samples, theta0_samples = theta0_samples, tau_samples = tau_samples)
 }
 

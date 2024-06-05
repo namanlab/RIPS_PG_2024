@@ -2,6 +2,7 @@
 ################# EP1 with smooth elastic function #######################
 #################
 
+library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
@@ -97,18 +98,24 @@ get_params <- function(xh, nt, nc, nh, pc, pt, ph, H, N, R){
   params$t_beta = 0.1
   params$c_alpha = 0.1
   params$c_beta = 0.1
-  params$a0 = 0.5
   return(params)
 }
 
 
 # Function to perform MCMC sampling for the posterior using power prior
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
-  a0 <- params$a0
   
-  # Define the prior distribution for a0
-  log_prior_a0 <- function(a0) {
-    return(dbeta(a0, 1, 1, log = T))
+  # Define the prior distribution for a0 depending on tau
+  log_prior_a0 <- function(a0, tau) {
+    g_tau <- function(tau) {
+      return(max(tau, 1))
+    }
+    return((g_tau(tau) - 1) * log(a0))
+  }
+  
+  # Define the prior distribution for tau
+  log_prior_tau <- function(tau) {
+    return(ifelse(tau <= 30 & tau >= 0, 1, 0))
   }
   
   # Logit and inverse logit functions
@@ -119,63 +126,79 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   log_posterior <- function(theta) {
     p <- inv_logit(theta[1])
     a0 <- inv_logit(theta[2])
+    theta0 <- inv_logit(theta[3])
+    tau <- exp(theta[4])
     
     # Likelihood
     log_lik_current <- dbinom(xc, nc, p, log = TRUE)
-    log_lik_hist <- dbinom(xh, nh, p, log = TRUE)
+    log_lik_hist <- dbinom(xh, nh, theta0, log = TRUE)
     
     # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
+    log_prior_tau_val <- log_prior_tau(tau)
+    log_prior_a0_val <- log_prior_a0(a0, tau)
+    log_prior_p0 <- dbeta(theta0, params$c_alpha, params$c_beta, log = TRUE)
+    
+    # Commensurate prior for p
+    anew = theta0*1/tau
+    bnew = (1 - theta0)*1/tau
+    log_prior_p <- dbeta(p, anew, bnew, log = T)
     
     # Commensurate prior for p
     integ_log <- log(beta(a0*xh + 1, a0*(nh - xh) + 1))
-    jacob_log <- log(p*(1 - p)) + log(a0*(1 - a0))
+    jacob_log <- log(p*(1 - p)) + log(a0*(1 - a0)) + log(theta0*(1 - theta0)) + log(tau)
     
     # Posterior
-    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_p + integ_log + jacob_log
+    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_p + log_prior_tau_val + log_prior_a0_val - integ_log + jacob_log + log_prior_p0
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
     }
     return(log_post)
   }
-  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))), logit(0.5))
+  init_values <- c(logit(mean(xc/nc)), logit(0.5), logit(mean(xh/nh)), log(2))
   # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10, force.samp = T)
   # Extract posterior samples for p
   logit_p_samples <- samples[, 1]
-  p_samples <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
+  p_samples <- inv_logit(logit_p_samples)
   
   # log prior for ess:
   log_prior <- function(theta) {
     p <- inv_logit(theta[1])
     a0 <- inv_logit(theta[2])
+    theta0 <- inv_logit(theta[3])
+    tau <- exp(theta[4])
     
     # Likelihood
-    log_lik_hist <- dbinom(xh, nh, p, log = TRUE)
+    log_lik_hist <- dbinom(xh, nh, theta0, log = TRUE)
     
     # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
+    log_prior_tau_val <- log_prior_tau(tau)
+    log_prior_a0_val <- log_prior_a0(a0, tau)
+    log_prior_p0 <- dbeta(theta0, params$c_alpha, params$c_beta, log = TRUE)
+    
+    # Commensurate prior for p
+    anew = theta0*1/tau
+    bnew = (1 - theta0)*1/tau
+    log_prior_p <- dbeta(p, anew, bnew, log = T)
     
     # Commensurate prior for p
     integ_log <- log(beta(a0*xh + 1, a0*(nh - xh) + 1))
-    jacob_log <- log(p*(1 - p)) + log(a0*(1 - a0))
+    jacob_log <- log(p*(1 - p)) + log(a0*(1 - a0)) + log(theta0*(1 - theta0)) + log(tau)
     
     # Posterior
-    log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_p - integ_log + jacob_log
+    log_post <- (a0 * log_lik_hist) + log_prior_p + log_prior_tau_val + log_prior_a0_val - integ_log + jacob_log + log_prior_p0
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
     }
     return(log_post)
   }
-  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))), logit(0.5))
+  init_values <- c(logit(mean(xc/nc)), logit(0.5), logit(mean(xh/nh)), log(2))
   # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10)
+  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10, force.samp = T)
   logit_p_samples <- samples[, 1]
-  p_samples_prior <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
+  p_samples_prior <- inv_logit(logit_p_samples)
   ess <- (params$c_alpha + xh)*(params$c_beta + nh - xh)/(var(p_samples_prior)*(params$c_alpha + params$c_beta + nh)^2*(params$c_alpha + params$c_beta + nh + 1))*nh
   print(ess)
   list(prost_samples = p_samples, ess = ess)
