@@ -1,5 +1,5 @@
 #################
-################# EP1 with smooth elastic function #######################
+################# EP1 with commensurate power prior #######################
 #################
 
 library(MCMCpack)
