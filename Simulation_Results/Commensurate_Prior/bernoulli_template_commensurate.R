@@ -24,6 +24,10 @@ run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
   xc_act <- NULL # actual control samples
   xc_samp <- NULL # samples based on prosterior predictive
   
+  # for plot of distributions (only calculated in last sim)
+  distr_plot_prost <- NULL
+  distr_plot_prost_method <- NULL
+  
   # any params for models to be computed a-priori -- TO CHANGE DEPENDING ON METHOD
   params <- get_params(xh, nt, nc, nh, pc, pt, ph, H, N, R)
   
@@ -61,6 +65,14 @@ run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
     # posterior predictive check:
     xc_act <- c(xc_act, rbinom(length(pc_post), nc, pc))
     xc_samp <- c(xc_samp, rbinom(length(pc_post), nc, pc_post))
+    
+    # plot of prost distr:
+    if (trial == R){
+      # for plot of distributions (only calculated in last sim)
+      pc_def <-rbeta(N, params$c_alpha + xc + xh, params$c_beta + nc + nh - xc - xh)
+      distr_plot_prost <- c(distr_plot_prost, pc_def)
+      distr_plot_prost_method <- c(distr_plot_prost_method, pc_post)
+    }
   }
   timeend <- Sys.time()
   EHSS <- mean(ess)
@@ -83,10 +95,15 @@ run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
                         pivot_longer(1:2, names_to = "type", values_to = "val") ) +
     geom_histogram(aes(x = val, y = after_stat(density), fill = type), alpha = 0.7, binwidth = 1) +
     theme_bw() + scale_fill_manual(values = c("red", "blue"))
+  plot_density <- ggplot(data = tibble("All Historical Data" = distr_plot_prost, "Adjusting with Method" = distr_plot_prost_method) %>% 
+                           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
+    geom_density(aes(x = val, fill = type), alpha = 0.3) +
+    theme_bw() + scale_fill_manual(values = c("yellow", "blue")) +
+    geom_vline(xintercept = pc, linetype = "dashed")
   return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
               quantile_interval_count_mean = quantile_interval_count_mean,
               bias_point_est = bias_point_est, var_point_est = var_point_est, mse_point_est = mse_point_est,
-              time_diff = timeend - timestart, plot_comp = plot_comp))
+              time_diff = timeend - timestart, plot_comp = plot_comp, plot_density = plot_density))
   
 }
 
@@ -157,7 +174,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   }
   init_values <- c(logit(mean(xc/nc)), logit(0.5), logit(mean(xh/nh)), log(2))
   # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10, force.samp = T)
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1, force.samp = T)
   # Extract posterior samples for p
   logit_p_samples <- samples[, 1]
   p_samples <- inv_logit(logit_p_samples)
@@ -196,7 +213,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   }
   init_values <- c(logit(mean(xc/nc)), logit(0.5), logit(mean(xh/nh)), log(2))
   # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 10, force.samp = T)
+  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1, force.samp = T)
   logit_p_samples <- samples[, 1]
   p_samples_prior <- inv_logit(logit_p_samples)
   ess <- mean(xh/nh)*(1 - mean(xh/nh))/(var(p_samples_prior))
@@ -218,20 +235,26 @@ pc <- 0.4 # true mean of control
 # strong congruence between control and historical
 res1 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.4, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res1$plot_comp
+res1$plot_density
 res2 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.4, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res2$plot_comp
+res2$plot_density
 
 # weak congruence between control and historical
 res3 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.45, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res3$plot_comp
+res3$plot_density
 res4 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.45, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res4$plot_comp
+res4$plot_density
 
 # no congruence between control and historical
 res5 <- run_simulation(nt, nc, nh, pc, pt = 0.4, ph = 0.6, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
 res5$plot_comp
+res5$plot_density
 res6 <- run_simulation(nt, nc, nh, pc, pt = 0.6, ph = 0.6, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
 res6$plot_comp
+res6$plot_density
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
