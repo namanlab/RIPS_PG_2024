@@ -81,7 +81,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   cat("MSE of point estiamtor based on control prior", formatC(mse_point_est, digits = 4, format = "f"), sep = " ", "\n")
   cat("total time for", R, "simulations is", formatC(timeend - timestart, digits = 4, format = "f"), sep = " ", "\n")
   plot_comp <- ggplot(data = tibble("Control Distribution" = xc_act, "Prost Predictive" = xc_samp) %>% 
-           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
+                        pivot_longer(1:2, names_to = "type", values_to = "val") ) +
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue"))
   return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
@@ -176,6 +176,6 @@ res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_elastic_prior_normal.rds")
+saveRDS(results, file = "../results/simulation_results_power_prior_normal.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")

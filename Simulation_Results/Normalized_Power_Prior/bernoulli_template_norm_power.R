@@ -213,6 +213,6 @@ res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_elastic_prior_bernoulli.rds")
+saveRDS(results, file = "../results/simulation_results_normalized_power_prior_bernoulli.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")

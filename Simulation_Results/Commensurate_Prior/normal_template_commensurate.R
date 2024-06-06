@@ -140,7 +140,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     
     # Posterior
     log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma2 - integ_log + jacob_log
-
+    
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
     }
@@ -212,8 +212,6 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
 #########--------------------------------------------------------------#########
 
 
-
-
 ## settings
 nc <- 25 # current control size
 nt <- 50 # current treatment size
@@ -243,6 +241,6 @@ res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_commensurate_prior_normal.rds")
+saveRDS(results, file = "../results/simulation_results_commensurate_prior_normal.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")

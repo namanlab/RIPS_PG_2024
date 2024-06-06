@@ -110,20 +110,20 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
     mu <- theta[1]
-    sigma <- exp(theta[2])
+    sigma2 <- exp(theta[2])
     a0 <- inv_logit(theta[3])
     
     # Likelihood
-    log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
-    log_lik_hist <- sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_lik_current <- sum(dnorm(xc, mu, sqrt(sigma2), log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, mu, sqrt(sigma2), log = TRUE))
     
     # Prior distributions
     log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_sigma <- -sigma
+    log_prior_sigma <- -sigma2
     
     # Commensurate prior for θ
-    integ_log <- -a0/(2*sigma^2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma^2) - log(sigma/sqrt(nh*a0))
-    jacob_log <- log(sigma^2) + log(a0*(1 - a0))
+    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
+    jacob_log <- log(sigma2) + log(a0*(1 - a0))
     
     # Posterior
     log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_sigma - integ_log + jacob_log
@@ -137,20 +137,20 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Define the prior distribution for control arm using historical data only
   log_prior_only <- function(theta) {
     mu <- theta[1]
-    sigma <- exp(theta[2])
+    sigma2 <- exp(theta[2])
     a0 <- inv_logit(theta[3])
     
     # Likelihood
-    log_lik_hist <- sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, mu, sqrt(sigma2), log = TRUE))
     
     # Prior distributions
     log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_sigma <- -sigma
+    log_prior_sigma <- -sigma2
     
     # Commensurate prior for θ
     
-    integ_log <- -a0/(2*sigma^2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma^2) - log(sigma/sqrt(nh*a0))
-    jacob_log <- log(sigma^2) + log(a0*(1 - a0))
+    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
+    jacob_log <- log(sigma2) + log(a0*(1 - a0))
     
     # Posterior
     log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_sigma - integ_log + jacob_log
@@ -226,6 +226,6 @@ res6$plot_comp
 
 # Combine results into a list and Save the list as an RDS file
 results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "simulation_results_commensurate_prior_normal.rds")
+saveRDS(results, file = "../results/simulation_results_normalized_power_prior_normal.rds")
 
 # Load the results: results <- readRDS("simulation_results.rds")
