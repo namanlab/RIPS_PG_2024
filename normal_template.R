@@ -1,7 +1,3 @@
-#################
-################# EP1 with smooth elastic function #######################
-#################
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)

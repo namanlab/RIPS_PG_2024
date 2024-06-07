@@ -1,13 +1,8 @@
-#################
-################# EP1 with smooth elastic function #######################
-#################
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
-# ADD ANY OTHER PACKAGES
 
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   

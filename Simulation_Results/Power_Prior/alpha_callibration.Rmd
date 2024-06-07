@@ -1,3 +1,17 @@
+---
+title: "alpha_callibration"
+author: "Naman Agrawal"
+date: "2024-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+```{r}
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
@@ -17,9 +31,13 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   width_quantile_interval <- NULL # width of credible interval
   point_est <- NULL # point estimator based on control prior
   xc_act <- NULL # actual control samples
-  xc_samp <- NULL # samples based on posterior predictive
+  xc_samp <- NULL # samples based on prosterior predictive
   
-  # any params for models to be computed a-priori -- TO CHANGE DEPENDING ON METHOD
+  # for plot of distributions (only calculated in last sim)
+  distr_plot_prost <- NULL
+  distr_plot_prost_method <- NULL
+  
+  # any params for models to be computed a-priori -- TO CHANGE DEPENIDNG ON METHOD
   params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
   
   for(trial in 1:R){
@@ -29,7 +47,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     xc <- rnorm(nc, uc, sigc)
     xt <- rnorm(nt, ut, sigt)
     
-    # posterior for control arm -- TO CHANGE DEPENDING ON METHOD
+    # posterior for control arm -- TO CHANGE DEPENIDNG ON METHOD
     res_inter <- get_control_prost(params, xc, xh, nc, nh, H, N)
     muc <- res_inter$prost_samples
     
@@ -58,10 +76,6 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     # posterior predictive check:
     xc_act <- c(xc_act, rnorm(length(muc), uc, sigc))
     xc_samp <- c(xc_samp, rnorm(length(muc), muc, sigc))
-    
-    # for plot of distributions (only calculated in last sim)
-    distr_plot_prost <- NULL
-    distr_plot_prost_method <- NULL
     
     # plot of prost distr:
     if (trial == R){
@@ -95,7 +109,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue"))
   plot_density <- ggplot(data = tibble("All Historical Data" = distr_plot_prost, "Adjusting with Method" = distr_plot_prost_method) %>% 
-                           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
+           pivot_longer(1:2, names_to = "type", values_to = "val") ) +
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue")) +
     geom_vline(xintercept = uc, linetype = "dashed")
@@ -109,122 +123,34 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 
 
 get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
-  list()
+  list(a0 = 0.9)
 }
 
+# Function to perform MCMC sampling for the posterior using power prior
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
+  a0 <- params$a0
   
-  # Define the prior distribution for a0
-  log_prior_a0 <- function(a0) {
-    return(dbeta(a0, 1, 1, log = T))
-  }
-  
-  # Logit and inverse logit functions
-  logit <- function(p) log(p / (1 - p))
-  inv_logit <- function(x) exp(x) / (1 + exp(x))
-  
-  # Define the posterior distribution for control arm using commensurate power prior
+  # Define the posterior distribution for control arm using power prior
   log_posterior <- function(theta) {
+    # theta = (mu, log(sigma))
     mu <- theta[1]
-    sigma2 <- exp(theta[2])
-    a0 <- inv_logit(theta[3])
-    
-    # Likelihood
-    log_lik_current <- sum(dnorm(xc, mu, sqrt(sigma2), log = TRUE))
-    log_lik_hist <- sum(dnorm(xh, mu, sqrt(sigma2), log = TRUE))
-    
-    # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_sigma <- -sigma2
-    
-    # Commensurate prior for θ
-    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
-    jacob_log <- log(sigma2) + log(a0*(1 - a0))
-    
-    # Posterior
-    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_sigma - integ_log + jacob_log
-    
-    if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
-      return(-Inf)  # Return -Inf for invalid log-posterior values
-    }
+    sigma <- exp(theta[2])
+    log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
+    log_lik_hist <- a0 * sum(dnorm(xh, mu, sigma, log = TRUE))
+    log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
+    log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
+    log_post <- log_lik_current + log_lik_hist + log_prior_mu + log_prior_sigma
     return(log_post)
   }
-  
-  init_values <- c(mean(xc), log(sd(xc)), logit(0.5))  # Initial values for MCMC sampling
-  # Perform MCMC sampling for posterior
-  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
-                          mcmc = N, burnin = 1000, thin = 1, force.samp = T,
-                          optim.method = "Nelder-Mead")
-  
-  # Extract posterior samples for mu, sigma, a0, theta0, and tau
+  init_values <- c(mean(xc), log(sd(xc)))
+  # Perform MCMC sampling
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1)
+  # Extract posterior samples for mu and sigma
   mu_samples <- samples[, 1]
   sigma_samples <- exp(samples[, 2])
-  a0_samples <- inv_logit(samples[, 3])
   
-  # Calculate effective sample size (ESS)
   ess <- var(c(xc, xh))/var(mu_samples)
-  
   list(prost_samples = mu_samples, ess = ess)
 }
+```
 
-
-
-#########--------------------------------------------------------------#########
-############################ NO CHANGE TO BE MADE  #############################
-#########--------------------------------------------------------------#########
-
-
-
-
-## settings
-nc <- 25 # current control size
-nt <- 50 # current treatment size
-nh <- 50 # historical control size
-sigc <- 1 # control sd
-sigt <- 1 # treatment sd
-sigh <- 1 # historical sd
-uc <- 1 # true mean of control
-
-# strong congruence between control and historical
-res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res1$plot_comp
-res1$plot_density
-res2 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res2$plot_comp
-res2$plot_density
-
-# weak congruence between control and historical
-res3 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res3$plot_comp
-res3$plot_density
-res4 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res4$plot_comp
-res4$plot_density
-
-# no congruence between control and historical
-res5 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res5$plot_comp
-res5$plot_density
-res6 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res6$plot_comp
-res6$plot_density
-
-# Combine results into a list and Save the list as an RDS file
-results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "../results/simulation_results_normalized_power_prior_normal.rds")
-
-# Load the results: results <- readRDS("simulation_results.rds")
-
-
-
-
-# Delta vs MSE Plot
-delta <- seq(0, 0.5, by = 0.05)
-mse_vals <- NULL
-for (i in delta){
-  sim <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1 + i, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-  mse_vals <- c(mse_vals, sim$mse_point_est)
-}
-ggplot(data = data.frame(delta = delta, mse = mse_vals)) +
-  geom_line(aes(x = delta, y = mse_vals)) +
-  theme_bw() 

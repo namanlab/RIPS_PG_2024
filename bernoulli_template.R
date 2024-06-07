@@ -1,7 +1,3 @@
-#################
-################# EP1 with smooth elastic function #######################
-#################
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
@@ -142,22 +138,8 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Extract posterior samples for p
   logit_p_samples <- samples[, 1]
   p_samples <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
-  
-  # log prior for ess:
-  log_prior <- function(theta) {
-    logit_p <- theta[1]
-    p <- exp(logit_p) / (1 + exp(logit_p))
-    log_lik_hist <- a0 * dbinom(xh, nh, p, log = TRUE)
-    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
-    log_post <- log_lik_hist + log_prior_p
-    return(log_post)
-  }
-  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))))
-  # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1)
-  logit_p_samples <- samples[, 1]
-  p_samples_prior <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
-  ess <- mean(xh/nh)*(1 - mean(xh/nh))/(var(p_samples_prior))
+  vecf <- xc + xh
+  ess <- mean(vecf/(nc + nh))*(1 - mean(vecf/(nc + nh)))/(var(p_samples))
   list(prost_samples = p_samples, ess = ess)
 }
 

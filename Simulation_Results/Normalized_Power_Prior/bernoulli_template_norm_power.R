@@ -1,13 +1,8 @@
-#################
-################# EP1 with smooth elastic function #######################
-#################
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
-# ADD ANY OTHER PACKAGES
 
 run_simulation <- function(nt, nc, nh, pc, pt, ph, H = 1, N, R, cutoff){
   
@@ -164,37 +159,8 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Extract posterior samples for p
   logit_p_samples <- samples[, 1]
   p_samples <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
-  
-  # log prior for ess:
-  log_prior <- function(theta) {
-    p <- inv_logit(theta[1])
-    a0 <- inv_logit(theta[2])
-    
-    # Likelihood
-    log_lik_hist <- dbinom(xh, nh, p, log = TRUE)
-    
-    # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_p <- dbeta(p, params$c_alpha, params$c_beta, log = TRUE)
-    
-    # Commensurate prior for p
-    integ_log <- log(beta(a0*xh + 1, a0*(nh - xh) + 1))
-    jacob_log <- log(p*(1 - p)) + log(a0*(1 - a0))
-    
-    # Posterior
-    log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_p - integ_log + jacob_log
-    
-    if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
-      return(-Inf)  # Return -Inf for invalid log-posterior values
-    }
-    return(log_post)
-  }
-  init_values <- c(log(mean(xc/nc) / (1 - mean(xc/nc))), logit(0.5))
-  # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1)
-  logit_p_samples <- samples[, 1]
-  p_samples_prior <- exp(logit_p_samples) / (1 + exp(logit_p_samples))
-  ess <- mean(xh/nh)*(1 - mean(xh/nh))/(var(p_samples_prior))
+  vecf <- xc + xh
+  ess <- mean(vecf/(nc + nh))*(1 - mean(vecf/(nc + nh)))/(var(p_samples))
   list(prost_samples = p_samples, ess = ess)
 }
 

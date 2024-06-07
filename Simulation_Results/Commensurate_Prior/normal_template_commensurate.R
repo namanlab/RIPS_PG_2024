@@ -1,13 +1,8 @@
-#################
-################# EP1 with commensurate power prior #######################
-#################
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
-# ADD ANY OTHER PACKAGES
 
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
