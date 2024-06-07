@@ -114,7 +114,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 
 
 get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
-  list(a0 = 0.5)
+  list(a0 = 0.9)
 }
 
 # Function to perform MCMC sampling for the posterior using power prior
@@ -140,23 +140,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   mu_samples <- samples[, 1]
   sigma_samples <- exp(samples[, 2])
   
-  # log prior for ess:
-  log_prior <- function(theta) {
-    # theta = (mu, log(sigma))
-    mu <- theta[1]
-    sigma <- exp(theta[2])
-    log_lik_hist <- a0 * sum(dnorm(xh, mu, sigma, log = TRUE))
-    log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
-    log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
-    log_post <- log_lik_hist + log_prior_mu + log_prior_sigma
-    return(log_post)
-  }
-  init_values <- c(mean(xc), log(sd(xc)))
-  # Perform MCMC sampling
-  samples <- MCMCmetrop1R(log_prior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1)
-  mu_samples_prior <- samples[, 1]
-  
-  ess <- var(xh)/var(mu_samples_prior)
+  ess <- var(c(xc, xh))/var(mu_samples)
   list(prost_samples = mu_samples, ess = ess)
 }
 

@@ -155,33 +155,6 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     return(log_post)
   }
   
-  # Define the prior distribution for control arm using historical data only
-  log_prior_only <- function(theta) {
-    mu <- theta[1]
-    sigma2 <- exp(theta[2])
-    a0 <- inv_logit(theta[3])
-    
-    # Likelihood
-    log_lik_hist <- sum(dnorm(xh, mu, sqrt(sigma2), log = TRUE))
-    
-    # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_sigma <- -sigma2
-    
-    # Commensurate prior for θ
-    
-    integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
-    jacob_log <- log(sigma2) + log(a0*(1 - a0))
-    
-    # Posterior
-    log_post <- (a0 * log_lik_hist) + log_prior_a0_val + log_prior_sigma - integ_log + jacob_log
-    
-    if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
-      return(-Inf)  # Return -Inf for invalid log-posterior values
-    }
-    return(log_post)
-  }
-  
   init_values <- c(mean(xc), log(sd(xc)), logit(0.5))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
@@ -194,19 +167,9 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   a0_samples <- inv_logit(samples[, 3])
   
   # Calculate effective sample size (ESS)
-  ess <- var(xh) / var(mu_samples)
+  ess <- var(c(xc, xh))/var(mu_samples)
   
-  # Perform MCMC sampling for prior only
-  init_values_prior <- c(mean(xh), log(sd(xh)), logit(0.5))
-  samples_prior <- MCMCmetrop1R(log_prior_only, theta.init = init_values_prior, mcmc = N, burnin = 1000, thin = 1, force.samp = T)
-  
-  # Extract prior samples for mu
-  mu_samples_prior <- samples_prior[, 1]
-  
-  # Calculate effective sample size (ESS) based on prior only
-  ess_prior <- var(xh) / var(mu_samples_prior)
-  
-  list(prost_samples = mu_samples, ess = ess, ess_prior = ess_prior, a0_samples = a0_samples)
+  list(prost_samples = mu_samples, ess = ess)
 }
 
 
