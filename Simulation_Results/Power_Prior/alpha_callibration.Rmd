@@ -18,7 +18,7 @@ library(invgamma)
 library(tidyverse)
 library(HDInterval)
 
-run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
+run_simulation <- function(a0, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
   set.seed(42)
   xh <- rnorm(nh, uh, sigh) # historical data
@@ -38,7 +38,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   distr_plot_prost_method <- NULL
   
   # any params for models to be computed a-priori -- TO CHANGE DEPENIDNG ON METHOD
-  params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
+  params <- list(a0 = a0)
   
   for(trial in 1:R){
     
@@ -113,17 +113,12 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue")) +
     geom_vline(xintercept = uc, linetype = "dashed")
-  return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
+  return(list(prob.rej = prob_rej, EHSS = EHSS, width_quantile_interval_mean = width_quantile_interval_mean, 
               quantile_interval_count_mean = quantile_interval_count_mean,
               bias_point_est = bias_point_est, var_point_est = var_point_est, mse_point_est = mse_point_est,
               time_diff = timeend - timestart, plot_comp = plot_comp, distr_plot_prost = distr_plot_prost,
               distr_plot_prost_method = distr_plot_prost_method, plot_density = plot_density))
   
-}
-
-
-get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
-  list(a0 = 0.9)
 }
 
 # Function to perform MCMC sampling for the posterior using power prior
@@ -152,5 +147,142 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   ess <- var(c(xc, xh))/var(mu_samples)
   list(prost_samples = mu_samples, ess = ess)
 }
+
+
+nc <- 25 # current control size
+nt <- 50 # current treatment size
+nh <- 50 # historical control size
+sigc <- 1 # control sd
+sigt <- 1 # treatment sd
+sigh <- 1 # historical sd
+uc <- 1 # true mean of control
+
+run_a0_c <- function(a0){
+  res1 <- run_simulation(a0, nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+  return(res1)
+}
+
+run_a0_p <- function(a0){
+  res1 <- run_simulation(a0, nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+  return(res1)
+}
+
+run_a0_i <- function(a0){
+  res1 <- run_simulation(a0, nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+  return(res1)
+}
+
+
 ```
+
+# Congruent
+
+
+```{r}
+power_mse <- power_bias <- power_variance <- power_ess <- NULL
+a0 <- seq(0, 1, by = 0.1)
+for (i in a0) {
+  sim <- run_a0_c(i)
+  power_mse <- c(power_mse, sim$mse_point_est)
+  power_bias <- c(power_bias, sim$bias_point_est)
+  power_variance <- c(power_variance, sim$var_point_est)
+  power_ess <- c(power_ess, sim$EHSS)
+}
+df <- tibble(a0 = a0, mse = power_mse, variance = power_variance, bias = power_bias, ess = power_ess)
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = mse)) +
+  theme_bw() +
+  labs(x = "a0", y = "MSE")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = variance)) +
+  theme_bw() +
+  labs(x = "a0", y = "Variance")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = bias)) +
+  theme_bw() +
+  labs(x = "a0", y = "Bias")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = ess)) +
+  theme_bw() +
+  labs(x = "a0", y = "ESS")
+```
+
+
+# Partially Congruent
+
+
+```{r}
+power_mse <- power_bias <- power_variance <- power_ess <- NULL
+a0 <- seq(0, 1, by = 0.1)
+for (i in a0) {
+  sim <- run_a0_p(i)
+  power_mse <- c(power_mse, sim$mse_point_est)
+  power_bias <- c(power_bias, sim$bias_point_est)
+  power_variance <- c(power_variance, sim$var_point_est)
+  power_ess <- c(power_ess, sim$EHSS)
+}
+df <- tibble(a0 = a0, mse = power_mse, variance = power_variance, bias = power_bias, ess = power_ess)
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = mse)) +
+  theme_bw() +
+  labs(x = "a0", y = "MSE")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = variance)) +
+  theme_bw() +
+  labs(x = "a0", y = "Variance")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = bias)) +
+  theme_bw() +
+  labs(x = "a0", y = "Bias")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = ess)) +
+  theme_bw() +
+  labs(x = "a0", y = "ESS")
+```
+
+
+# Incongruent
+
+
+```{r}
+power_mse <- power_bias <- power_variance <- power_ess <- NULL
+a0 <- seq(0, 1, by = 0.1)
+for (i in a0) {
+  sim <- run_a0_i(i)
+  power_mse <- c(power_mse, sim$mse_point_est)
+  power_bias <- c(power_bias, sim$bias_point_est)
+  power_variance <- c(power_variance, sim$var_point_est)
+  power_ess <- c(power_ess, sim$EHSS)
+}
+df <- tibble(a0 = a0, mse = power_mse, variance = power_variance, bias = power_bias, ess = power_ess)
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = mse)) +
+  theme_bw() +
+  labs(x = "a0", y = "MSE")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = variance)) +
+  theme_bw() +
+  labs(x = "a0", y = "Variance")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = bias)) +
+  theme_bw() +
+  labs(x = "a0", y = "Bias")
+
+ggplot(data = df) +
+  geom_line(aes(x = a0, y = ess)) +
+  theme_bw() +
+  labs(x = "a0", y = "ESS")
+```
+
 
