@@ -99,11 +99,13 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     geom_density(aes(x = val, fill = type), alpha = 0.3) +
     theme_bw() + scale_fill_manual(values = c("yellow", "blue")) +
     geom_vline(xintercept = uc, linetype = "dashed")
-  return(list(prob.rej = prob_rej, width_quantile_interval_mean = width_quantile_interval_mean, 
+  return(list(prob_rej = prob_rej, EHSS = EHSS, 
+              width_quantile_interval_mean = width_quantile_interval_mean, 
               quantile_interval_count_mean = quantile_interval_count_mean,
-              bias_point_est = bias_point_est, var_point_est = var_point_est, mse_point_est = mse_point_est,
-              time_diff = timeend - timestart, plot_comp = plot_comp, distr_plot_prost = distr_plot_prost,
-              distr_plot_prost_method = distr_plot_prost_method, plot_density = plot_density))
+              bias_point_est = bias_point_est, var_point_est = var_point_est, 
+              mse_point_est = mse_point_est,
+              time_diff = timeend - timestart, 
+              plot_comp = plot_comp, plot_density = plot_density))
   
 }
 
