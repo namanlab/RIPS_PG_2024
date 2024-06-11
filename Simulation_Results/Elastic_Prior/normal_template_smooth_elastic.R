@@ -255,12 +255,12 @@ saveRDS(results, file = "../../results/ssimulation_results_elastic_prior_normal.
 
 
 # Delta vs MSE Plot
-delta <- seq(0, 0.5, by = 0.05)
-mse_vals <- NULL
-for (i in delta){
-  sim <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1 + i, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-  mse_vals <- c(mse_vals, sim$mse_point_est)
-}
-ggplot(data = data.frame(delta = delta, mse = mse_vals)) +
-  geom_line(aes(x = delta, y = mse_vals)) +
-  theme_bw() 
+# delta <- seq(0, 0.5, by = 0.05)
+# mse_vals <- NULL
+# for (i in delta){
+#   sim <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1 + i, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
+#   mse_vals <- c(mse_vals, sim$mse_point_est)
+# }
+# ggplot(data = data.frame(delta = delta, mse = mse_vals)) +
+#   geom_line(aes(x = delta, y = mse_vals)) +
+#   theme_bw()
