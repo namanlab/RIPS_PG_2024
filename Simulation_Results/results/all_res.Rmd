@@ -929,7 +929,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N){
   if(gt == 0) gt <- 0.00001 # numerical stability
   # posterior for control arm
   temp <- sample_poster(xh, nh, xc, nc, gt, sim = N + 10000, nburn=10000)
-  res <- list(ess = gt*nh, prost_samples = temp$muc_post) # 
+  res <- list(ess = gt*nh + nc, prost_samples = temp$muc_post) # 
   return(res)
 }
 
