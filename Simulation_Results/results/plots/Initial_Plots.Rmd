@@ -38,9 +38,18 @@ df <- df %>%
     commensurate_power_variance = commensurate_power_variance
   )
 
+df$map_mse = mse_vals
+df$map_bias = bias_vals
+df$map_variance = var_vals
+
 # Save the results
 saveRDS(df, file = "../results_mse_n_delta.rds")
 ```
+
+```{r}
+
+```
+
 
 
 
