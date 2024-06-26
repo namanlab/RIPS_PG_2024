@@ -3,11 +3,13 @@ library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
+library(ks)
 
-run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
+run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, pc, ph, uc, ut, uh, H = 1, N, R, cutoff){
   
   set.seed(42)
-  xh <- rnorm(nh, uh, sigh) # historical data
+  tau_h <- rnorm(nh, 0, ph)
+  xh <- rnorm(nh, uh + tau_h, sigh) # historical data
   
   # Metrics to calculate
   rej_null <- 0 # number of rejections
@@ -24,17 +26,18 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   distr_plot_prost_method <- NULL
   
   # any params for models to be computed a-priori -- TO CHANGE DEPENIDNG ON METHOD
-  params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
+  params <- get_params(xh, nt, nc, nh, pc, ph, sigc, sigt, sigh, uc, ut, uh, H, N, R)
   
   for(trial in 1:R){
     
     set.seed(100 + trial)
     # generate control and treatment data
-    xc <- rnorm(nc, uc, sigc)
+    tau_c <- rnorm(nc, 0, pc)
+    xc <- rnorm(nc, uc + tau_c, sigc)
     xt <- rnorm(nt, ut, sigt)
     
     # posterior for control arm -- TO CHANGE DEPENIDNG ON METHOD
-    res_inter <- get_control_prost(params, xc, xh, nc, nh, H, N)
+    res_inter <- get_control_prost(params, xc, xh, nc, nh, H, N, pc, ph)
     muc <- res_inter$prost_samples
     
     # posterior for treatment arm
@@ -110,32 +113,39 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 }
 
 
-get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
+get_params <- function(xh, nt, nc, nh, pc, ph, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
   list(a0 = 0.9)
 }
 
 # Function to perform MCMC sampling for the posterior using power prior
-get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
+get_control_prost <- function(params, xc, xh, nc, nh, H, N, pc, ph) {
   a0 <- params$a0
   
   # Define the posterior distribution for control arm using power prior
   log_posterior <- function(theta) {
     # theta = (mu, log(sigma))
     mu <- theta[1]
-    sigma <- exp(theta[2])
-    log_lik_current <- sum(dnorm(xc, mu, sigma, log = TRUE))
-    log_lik_hist <- a0 * sum(dnorm(xh, mu, sigma, log = TRUE))
-    log_prior_mu <- dnorm(mu, 0, 100, log = TRUE)
-    log_prior_sigma <- dnorm(theta[2], 0, 100, log = TRUE)  # log(sigma) is normal
-    log_post <- log_lik_current + log_lik_hist + log_prior_mu + log_prior_sigma
+    sigma_h2 <- exp(theta[2])
+    sigma_c2 <- exp(theta[3])
+    tau_h <- theta[4:(nh + 3)]
+    tau_c <- theta[(nh + 4):(nc + nh + 3)]
+    
+    log_lik_current <- sum(dnorm(xc - tau_c, mu, sigma_c2, log = TRUE))
+    log_prior_tau_c <- sum(dnorm(tau_c, 0, pc, log = TRUE))
+    log_prior_sigma_c2 <- dnorm(sigma_c2, 0, 100, log = TRUE)
+    
+    log_lik_hist <- a0 * sum(dnorm(xh - tau_h, mu, sigma_h2, log = TRUE))
+    log_prior_tau_h <- sum(dnorm(tau_h, 0, ph, log = TRUE))
+    log_prior_sigma_h2 <- dnorm(sigma_h2, 0, 100, log = TRUE)
+    
+    log_post <- log_lik_hist + log_prior_tau_h + log_prior_sigma_h2 + log_lik_current + log_prior_tau_c + log_prior_sigma_c2
     return(log_post)
   }
-  init_values <- c(mean(xc), log(sd(xc)))
+  init_values <- c(mean(xc), log(var(xh)), log(var(xc)), rep(0, nc + nh))
   # Perform MCMC sampling
   samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, mcmc = N, burnin = 1000, thin = 1)
   # Extract posterior samples for mu and sigma
   mu_samples <- samples[, 1]
-  sigma_samples <- exp(samples[, 2])
   
   ess <- var(c(xc, xh))/var(mu_samples)
   list(prost_samples = mu_samples, ess = ess)
@@ -147,55 +157,20 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
 
 
 
-
 ## settings
-nc <- 25 # current control size
-nt <- 50 # current treatment size
-nh <- 50 # historical control size
-sigc <- 1 # control sd
-sigt <- 1 # treatment sd
-sigh <- 1 # historical sd
-uc <- 1 # true mean of control
+nc <- 30 # current control size
+nt <- 29 # current treatment size
+nh <- 24 # historical control size
+sigc <- 0.153^2 # control sd
+sigt <- 0.17^2 # treatment sd
+sigh <- 0.22^2 # historical sd
+uc <- 1.26 # true mean of control
+uh <- 1.18 # true mean of historical
+ut <- 1.08 # true mean of treatment
+pc <- 1
+ph <- 1
 
 # strong congruence between control and historical
-res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
+res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, pc, ph, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
 res1$plot_comp
 res1$plot_density
-res2 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res2$plot_comp
-res2$plot_density
-
-# weak congruence between control and historical
-res3 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res3$plot_comp
-res3$plot_density
-res4 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res4$plot_comp
-res4$plot_density
-
-# no congruence between control and historical
-res5 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res5$plot_comp
-res5$plot_density
-res6 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res6$plot_comp
-res6$plot_density
-
-# Combine results into a list and Save the list as an RDS file
-results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "../results/simulation_results_power_prior_normal.rds")
-
-# Load the results: results <- readRDS("simulation_results.rds")
-
-
-
-# # Delta vs MSE Plot
-# delta <- seq(0, 0.5, by = 0.05)
-# mse_vals <- NULL
-# for (i in delta){
-#   sim <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1 + i, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-#   mse_vals <- c(mse_vals, sim$mse_point_est)
-# }
-# ggplot(data = data.frame(delta = delta, mse = mse_vals)) +
-#   geom_line(aes(x = delta, y = mse_vals)) +
-#   theme_bw() 
