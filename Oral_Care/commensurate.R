@@ -7,7 +7,11 @@ library(HDInterval)
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
   set.seed(42)
-  xh <- rnorm(nh, uh, sigh) # historical data
+  xh_list <- lapply(1:length(nh), function(i) rnorm(nh[i], uh[i], sigh[i])) # list of historical data
+  xh <- do.call(c, xh_list)
+  nh <- length(xh)
+  sigh <- sd(xh)
+  uh <- mean(xh)
   
   # Metrics to calculate
   rej_null <- 0 # number of rejections
@@ -185,59 +189,69 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
 
 
 
-#########--------------------------------------------------------------#########
-############################ NO CHANGE TO BE MADE  #############################
-#########--------------------------------------------------------------#########
+write.csv(final_df, "results/commensurate_results.csv")
 
 
-## settings
-nc <- 25 # current control size
-nt <- 50 # current treatment size
-nh <- 50 # historical control size
-sigc <- 1 # control sd
-sigt <- 1 # treatment sd
-sigh <- 1 # historical sd
-uc <- 1 # true mean of control
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-# strong congruence between control and historical
-res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res1$plot_comp
-res1$plot_density
-res2 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res2$plot_comp
-res2$plot_density
+df_f <- read.csv("results/commensurate_results.csv")
+library(plotly)
 
-# weak congruence between control and historical
-res3 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res3$plot_comp
-res3$plot_density
-res4 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.2, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res4$plot_comp
-res4$plot_density
-
-# no congruence between control and historical
-res5 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-res5$plot_comp
-res5$plot_density
-res6 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1.5, uh = 1.5, H = 1, N = 10000, R = 100, cutoff = 0.95) # false null
-res6$plot_comp
-res6$plot_density
-
-# Combine results into a list and Save the list as an RDS file
-results <- list(res1 = res1, res2 = res2, res3 = res3, res4 = res4, res5 = res5, res6 = res6)
-saveRDS(results, file = "../results/simulation_results_commensurate_prior_normal.rds")
-
-# Load the results: results <- readRDS("simulation_results.rds")
+# ESS
+delta1 <- seq(-1, 1, length.out = 21)
+delta2 <- seq(-1, 1, length.out = 21)
+ess <- matrix(final_df$ess, nrow = 21, ncol = 21, byrow = TRUE)
+plot_ly(
+  x = ~delta2, y = ~delta1, z = ~ess,
+  type = 'surface'
+) %>% layout(
+  scene = list(
+    xaxis = list(title = "Delta 2"),
+    yaxis = list(title = "Delta 1"),
+    zaxis = list(title = "ESS")
+  ),
+  title = "3D Plot of ESS vs Delta1 and Delta2"
+)
+plot_ly(
+  x = ~delta2, y = ~delta1, z = ~ess,
+  type = 'heatmap'
+) %>% layout(
+  scene = list(
+    xaxis = list(title = "Delta 2"),
+    yaxis = list(title = "Delta 1"),
+    zaxis = list(title = "ESS")
+  ),
+  title = "3D Plot of ESS vs Delta1 and Delta2"
+)
 
 
+# Power
+pow <- matrix(final_df$pow, nrow = 21, ncol = 21, byrow = TRUE)
+plot_ly(
+  x = ~delta2, y = ~delta1, z = ~pow,
+  type = 'surface'
+)  %>% layout(
+  scene = list(
+    xaxis = list(title = "Delta 2"),
+    yaxis = list(title = "Delta 1"),
+    zaxis = list(title = "Power")
+  ),
+  title = "3D Plot of Power vs Delta1 and Delta2"
+)
+plot_ly(
+  x = ~delta2, y = ~delta1, z = ~pow,
+  type = 'heatmap'
+) %>% layout(
+  scene = list(
+    xaxis = list(title = "Delta 2"),
+    yaxis = list(title = "Delta 1"),
+    zaxis = list(title = "Power")
+  ),
+  title = "3D Plot of Power vs Delta1 and Delta2"
+)
 
-# # Delta vs MSE Plot
-# delta <- seq(0, 0.5, by = 0.05)
-# mse_vals <- NULL
-# for (i in delta){
-#   sim <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut = 1, uh = 1 + i, H = 1, N = 10000, R = 100, cutoff = 0.95) # true null
-#   mse_vals <- c(mse_vals, sim$mse_point_est)
-# }
-# ggplot(data = data.frame(delta = delta, mse = mse_vals)) +
-#   geom_line(aes(x = delta, y = mse_vals)) +
-#   theme_bw() 
+
+
+
+
