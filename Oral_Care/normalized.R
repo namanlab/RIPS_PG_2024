@@ -122,7 +122,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
   # Define the prior distribution for a0
   log_prior_a0 <- function(a0) {
-    return(dbeta(a0, 1, 1, log = T))
+    return(dbeta(a0, 0.1, 0.1, log = T))
   }
   
   # Logit and inverse logit functions
@@ -156,9 +156,9 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     return(log_post)
   }
   
-  init_values <- c(mean(xc), log(sd(xc)), logit(0.5))  # Initial values for MCMC sampling
+  init_values <- c(mean(xc), log(var(xc)), logit(0.5))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
-  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
+  samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
                           mcmc = N, burnin = 1000, thin = 1, force.samp = T,
                           optim.method = "Nelder-Mead")
   
@@ -168,6 +168,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   a0_samples <- inv_logit(samples[, 3])
   
   # Calculate effective sample size (ESS)
+  print(var(mu_samples))
   ess <- var(c(xc, xh))/var(mu_samples)
   
   list(prost_samples = mu_samples, ess = ess)
@@ -192,6 +193,9 @@ sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
 ut <- 1.08 + 1.33
 uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45)
+res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+res1$plot_density
+
 
 final_df <- NULL
 delta1 <- seq(-1, 1, 0.1)
@@ -202,7 +206,7 @@ for (i in delta1){
     ut <- 1.08 + 1.33 + i
     set.seed(42)
     uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45) + rnorm(4, j, 0.05)
-    res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10, R = 100, cutoff = 0.95) 
+    res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 1000, R = 100, cutoff = 0.95) 
     temp_df <- data.frame(delta1 = i, delta2 = j, pow = res1$prob_rej, ess = res1$EHSS)
     final_df <- rbind(final_df, temp_df)
   }
