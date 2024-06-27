@@ -182,7 +182,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   tau_samples <- exp(samples[, 5])
   
   # Calculate effective sample size (ESS)
-  ess <- var(c(xc, xh))/var(mu_samples)
+  ess <- mean(sigma_samples)/var(mu_samples)
   
   list(prost_samples = mu_samples, ess = ess)
 }
@@ -213,7 +213,7 @@ for (i in delta1){
     ut <- 1.08 + 1.33 + i
     set.seed(42)
     uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45) + rnorm(4, j, 0.05)
-    res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 1000, R = 100, cutoff = 0.95) 
+    res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
     temp_df <- data.frame(delta1 = i, delta2 = j, pow = res1$prob_rej, ess = res1$EHSS)
     final_df <- rbind(final_df, temp_df)
   }
