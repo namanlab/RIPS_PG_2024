@@ -169,7 +169,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     return(log_post)
   }
   
-  init_values <- c(mean(xc), log(sd(xc)), logit(0.5), mean(xh), log(1))  # Initial values for MCMC sampling
+  init_values <- c(mean(xc), log(var(xc)), logit(0.5), mean(xh), log(1))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
                           mcmc = N, burnin = 1000, thin = 1, force.samp = T)
