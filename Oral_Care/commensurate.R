@@ -48,7 +48,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     
     # METRICS:
     # probability that treatment is superior to control
-    pp <- mean(mut > muc)
+    pp <- mean(mut <= muc)
     # number of rejections of null
     if(pp >= cutoff){
       rej_null <- rej_null + 1

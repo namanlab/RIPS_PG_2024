@@ -44,7 +44,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     
     # METRICS:
     # probability that treatment is superior to control
-    pp <- mean(mut > muc)
+    pp <- mean(mut <= muc)
     # number of rejections of null
     if(pp >= cutoff){
       rej_null <- rej_null + 1
@@ -190,6 +190,8 @@ sigc <- 0.153 # control sd
 sigt <- 0.17 # treatment sd
 sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
+ut <- 1.08 + 1.33
+uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45)
 
 final_df <- NULL
 delta1 <- seq(-1, 1, 0.1)
