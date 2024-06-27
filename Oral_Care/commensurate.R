@@ -72,8 +72,8 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
       # for plot of distributions (only calculated in last sim)
       all_c <- c(xc, xh)
       t.par1 <- mean(all_c)
-      t.par2 <- var(all_c)/length(all_c)
-      muc_def <- rst(N, t.par1, sqrt(t.par2), length(all_c) - 1)
+      t.par2 <- res_inter$mss/length(all_c)
+      muc_def <- rnorm(N, t.par1, sd = sqrt(t.par2))
       distr_plot_prost <- c(distr_plot_prost, muc_def)
       distr_plot_prost_method <- c(distr_plot_prost_method, muc)
     }
@@ -184,7 +184,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   # Calculate effective sample size (ESS)
   ess <- mean(sigma_samples)/var(mu_samples)
   
-  list(prost_samples = mu_samples, ess = ess)
+  list(prost_samples = mu_samples, ess = ess, mss = mean(sigma_samples))
 }
 
 
@@ -203,6 +203,10 @@ sigc <- 0.153 # control sd
 sigt <- 0.17 # treatment sd
 sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
+ut <- 1.08 + 1.33
+uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45)
+res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+res1$plot_density
 
 final_df <- NULL
 delta1 <- seq(-1, 1, 0.1)
