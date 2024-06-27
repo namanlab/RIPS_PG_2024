@@ -228,7 +228,7 @@ write.csv(final_df, "results/commensurate_results.csv")
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-df_f <- read.csv("results/commensurate_results.csv")
+final_df <- read.csv("results/commensurate_results.csv")
 library(plotly)
 
 # ESS

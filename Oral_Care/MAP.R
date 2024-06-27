@@ -166,7 +166,7 @@ write.csv(final_df, "results/map_results.csv")
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-df_f <- read.csv("results/map_results.csv")
+final_df <- read.csv("results/map_results.csv")
 library(plotly)
 
 # ESS

@@ -212,7 +212,7 @@ write.csv(final_df, "results/normalized_results.csv")
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-df_f <- read.csv("results/normalized_results.csv")
+final_df <- read.csv("results/normalized_results.csv")
 library(plotly)
 
 # ESS
