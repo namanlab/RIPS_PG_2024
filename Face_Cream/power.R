@@ -33,7 +33,7 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
     power <- power + ifelse(res == pc - 1, 1, 0)
     print(power)
   }
-  cat("Power:", res/R)
+  cat("Power:", power/R)
   
 }
 

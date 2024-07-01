@@ -9,6 +9,7 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
   
   set.seed(42)
   xh <- rnorm(nh, uh, sqrt(sig^2 + tau^2))
+  power <- 0
   
   for(trial in 1:R){
     
@@ -23,7 +24,15 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
     res_inter <- get_control_prost(Xc, Zc, xc, xh, nc, nh, N, pc)
     muc <- res_inter$prost_samples
     print(apply(muc, 2, mean))
+    res <- 0
+    for (i in 1:(pc - 1)){
+      curv = mean(muc[,i] <= muc[,pc])
+      res <- res + ifelse(curv >= cutoff, 1, 0)
+    }
+    power <- power + ifelse(res == pc - 1, 1, 0)
+    print(power)
   }
+  cat("Power:", power/R)
   
 }
 
