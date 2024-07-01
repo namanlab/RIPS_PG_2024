@@ -1,0 +1,41 @@
+library(tidyverse)
+library(plotly)
+library(stringr)
+library(latex2exp)
+library(cowplot)
+
+final_df_1 <- read_csv("results/map_results.csv") 
+final_df_2 <- read_csv("results/normalized_results.csv")
+final_df_3 <- read_csv("results/commensurate_results.csv")
+final_df_4 <- read_csv("results/elastic_results.csv")
+
+# ESS
+ess_df <- final_df_1 %>% select("delta1","delta2","MAP" = "ess")
+ess_df$Normalized_Power = final_df_2$ess
+ess_df$Commensurate_Power = final_df_3$ess
+ess_df$Elastic = final_df_4$ess
+ess_df %>% pivot_longer(MAP:Elastic, names_to = "Method", values_to = "ESS") %>%
+  ggplot(aes(x = delta2, y = ESS, color = Method)) +
+  geom_line() + theme_bw() +
+  labs(x = TeX("$\\delta_2 = \\mu_h - \\mu_c$")) + geom_vline(xintercept = 0) +
+  scale_y_log10()
+
+
+# Power
+get_pow_heatmap <- function(df, name){
+  df %>% ggplot(aes(x = delta1, y = delta2, fill = pow)) +
+    geom_tile(color = "black") +
+    scale_fill_gradient(low = "red", high = "green") +
+    geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
+    labs(x = TeX("$\\delta_1 = \\mu_t - \\mu_c$"), 
+         y = TeX("$\\delta_2 = \\mu_h - \\mu_c$"),
+         title = name) +
+    theme_bw()
+}
+p1 <- get_pow_heatmap(final_df_1, "MAP")
+p2 <- get_pow_heatmap(final_df_2, "Normalized Power")
+p3 <- get_pow_heatmap(final_df_3, "Commensurate Power")
+p4 <- get_pow_heatmap(final_df_4, "Elastic")
+gridExtra::grid.arrange(p1, p2, p3, p4)
+
+
