@@ -18,24 +18,22 @@ ess_df %>% pivot_longer(MAP:Elastic, names_to = "Method", values_to = "ESS") %>%
   ggplot(aes(x = delta2, y = ESS, color = Method)) +
   geom_line() + theme_bw() +
   labs(x = TeX("$\\delta_2 = \\mu_h - \\mu_c$")) + geom_vline(xintercept = 0) +
-  scale_y_log10()
-
+  scale_y_log10() +
+  theme(axis.title = element_text(size = 13))
 
 # Power
-get_pow_heatmap <- function(df, name){
-  df %>% ggplot(aes(x = delta1, y = delta2, fill = pow)) +
-    geom_tile(color = "black") +
-    scale_fill_gradient(low = "red", high = "green") +
-    geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
-    labs(x = TeX("$\\delta_1 = \\mu_t - \\mu_c$"), 
-         y = TeX("$\\delta_2 = \\mu_h - \\mu_c$"),
-         title = name) +
-    theme_bw()
-}
-p1 <- get_pow_heatmap(final_df_1, "MAP")
-p2 <- get_pow_heatmap(final_df_2, "Normalized Power")
-p3 <- get_pow_heatmap(final_df_3, "Commensurate Power")
-p4 <- get_pow_heatmap(final_df_4, "Elastic")
-gridExtra::grid.arrange(p1, p2, p3, p4)
-
+pow_df <- final_df_1 %>% select("delta1","delta2","MAP" = "pow")
+pow_df$Normalized_Power = final_df_2$pow
+pow_df$Commensurate_Power = final_df_3$pow
+pow_df$Elastic = final_df_4$pow
+pow_df %>% pivot_longer(MAP:Elastic, names_to = "Method", values_to = "Power") %>% 
+  ggplot(aes(x = delta1, y = delta2, fill = Power)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "red", high = "green") +
+  geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
+  labs(x = TeX("$\\delta_1 = \\mu_t - \\mu_c$"), 
+       y = TeX("$\\delta_2 = \\mu_h - \\mu_c$")) +
+  theme_bw() +
+  facet_wrap(~Method) +
+  theme(axis.title = element_text(size = 13))
 
