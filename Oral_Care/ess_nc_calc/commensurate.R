@@ -208,8 +208,8 @@ sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
 
 final_df <- NULL
-delta1 <- seq(0, 1, 0.1)
-delta2 <- seq(0, 1, 0.1)
+delta1 <- seq(0, 0.5, 0.05)
+delta2 <- seq(0, 0.5, 0.05)
 nc_seq <- seq(5, 30, 5)
 for (nc in nc_seq){
   for (i in delta1){
