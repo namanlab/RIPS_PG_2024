@@ -49,7 +49,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     
     # METRICS:
     # probability that treatment is superior to control
-    pp <- mean(mut <= muc)
+    pp <- max(mean(mut <= muc), 1 - mean(mut <= muc)) # two sided
     pow <- c(pow, pp)
     # number of rejections of null
     if(pp >= cutoff){
@@ -88,7 +88,8 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   var_point_est <- var(point_est)
   mse_point_est <- bias_point_est^2 + var_point_est
   width_quantile_interval_mean <- mean(width_quantile_interval)
-  cat("probability of claiming efficacy is", prob_rej, "\n")
+  cat("power1", prob_rej, "\n")
+  cat("power2", mean(pow, na.rm = T), "\n")
   cat("effective historical sample size is", formatC(EHSS, digits = 2, format = "f"), sep = " ", "\n")
   cat("Mean Width of Credible Interval for Control Prior", formatC(width_quantile_interval_mean, digits = 4, format = "f"), sep = " ", "\n")
   cat("% of times muc is in quantile interval is", formatC(quantile_interval_count_mean*100, digits = 4, format = "f"), sep = " ", "\n")
@@ -242,7 +243,7 @@ for (nc in nc_seq){
       set.seed(42)
       uh <-  rep(uc, 4) + rnorm(4, j, 0.05)
       res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
-      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$pow, ess = res1$EHSS)
+      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow2 = res1$pow, pow1 = res1$prob_rej, ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
     }
   }
