@@ -210,6 +210,11 @@ for (nc in nc_seq){
       res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
       temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow2 = res1$pow, pow1 = res1$prob_rej, ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
+      
+      # Checkpointing
+      if (nrow(final_df) %% 150 == 0) {
+        write.csv(final_df, file = paste0("results/normalized_checkpoint_nc_", nrow(final_df), ".csv"))
+      }
     }
   }
 }
