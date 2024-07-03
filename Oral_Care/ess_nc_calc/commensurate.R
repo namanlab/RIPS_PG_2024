@@ -23,6 +23,10 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   xc_act <- NULL # actual control samples
   xc_samp <- NULL # samples based on posterior predictive
   
+  # for plot of distributions (only calculated in last sim)
+  distr_plot_prost <- NULL
+  distr_plot_prost_method <- NULL
+  
   # any params for models to be computed a-priori -- TO CHANGE DEPENDING ON METHOD
   params <- get_params(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R)
   
@@ -62,10 +66,6 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     # posterior predictive check:
     xc_act <- c(xc_act, rnorm(length(muc), uc, sigc))
     xc_samp <- c(xc_samp, rnorm(length(muc), muc, sigc))
-    
-    # for plot of distributions (only calculated in last sim)
-    distr_plot_prost <- NULL
-    distr_plot_prost_method <- NULL
     
     # plot of prost distr:
     if (trial == R){
@@ -120,9 +120,17 @@ get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
 
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
-  # Define the prior distribution for a0
-  log_prior_a0 <- function(a0) {
-    return(dbeta(a0, 1, 1, log = T))
+  # Define the prior distribution for a0 depending on tau
+  log_prior_a0 <- function(a0, tau) {
+    g_tau <- function(tau) {
+      return(max(tau, 1))
+    }
+    return((g_tau(tau) - 1) * log(a0))
+  }
+  
+  # Define the prior distribution for tau
+  log_prior_tau <- function(tau) {
+    log(dcauchy(log(tau), 0, 30)) - log(tau)
   }
   
   # Logit and inverse logit functions
@@ -134,21 +142,26 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     mu <- theta[1]
     sigma2 <- exp(theta[2])
     a0 <- inv_logit(theta[3])
+    theta0 <- theta[4]
+    tau <- exp(theta[5])
     
     # Likelihood
     log_lik_current <- sum(dnorm(xc, mu, sqrt(sigma2), log = TRUE))
-    log_lik_hist <- sum(dnorm(xh, mu, sqrt(sigma2), log = TRUE))
+    log_lik_hist <- sum(dnorm(xh, theta0, sqrt(sigma2), log = TRUE))
     
     # Prior distributions
-    log_prior_a0_val <- log_prior_a0(a0)
-    log_prior_sigma <- -sigma2
+    log_prior_tau_val <- log_prior_tau(tau)
+    log_prior_a0_val <- log_prior_a0(a0, tau)
+    log_prior_sigma2 <- -sigma2
     
     # Commensurate prior for θ
+    log_prior_mu <- -0.5 * tau * (mu - theta0)^2
+    
     integ_log <- -a0/(2*sigma2)*sum(xh^2) + nh*a0*mean(xh)^2/(2*sigma2) - log(sqrt(sigma2)/sqrt(nh*a0))
-    jacob_log <- log(sigma2) + log(a0*(1 - a0))
+    jacob_log <- log(sigma2) + log(a0*(1 - a0)) + log(tau)
     
     # Posterior
-    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_sigma - integ_log + jacob_log
+    log_post <- log_lik_current + (a0 * log_lik_hist) + log_prior_a0_val + log_prior_tau_val + log_prior_mu + log_prior_sigma2 - integ_log + jacob_log
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
@@ -156,125 +169,58 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     return(log_post)
   }
   
-  init_values <- c(mean(xc), log(var(xc)), logit(0.5))  # Initial values for MCMC sampling
+  init_values <- c(mean(xc), log(var(xc)), logit(0.5), mean(xh), log(1))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   R.utils::captureOutput(expr={
-  samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
-                          mcmc = N, burnin = 1000, thin = 1, force.samp = T,
-                          optim.method = "Nelder-Mead")
+  samples <- MCMCmetrop1R(log_posterior, theta.init = init_values, 
+                          mcmc = N, burnin = 1000, thin = 1, force.samp = T)
   })
   
   # Extract posterior samples for mu, sigma, a0, theta0, and tau
   mu_samples <- samples[, 1]
   sigma_samples <- exp(samples[, 2])
   a0_samples <- inv_logit(samples[, 3])
+  theta0_samples <- samples[, 4]
+  tau_samples <- exp(samples[, 5])
   
   # Calculate effective sample size (ESS)
-  ess <- mean(sigma_samples)/var(mu_samples)
+  num <- mean(sigma_samples)/(length(xc) + length(xh) + mean(sigma_samples)*mean(tau_samples))
+  ess <- num/var(mu_samples)*(length(xc) + length(xh))
   
   list(prost_samples = mu_samples, ess = ess, mss = mean(sigma_samples))
 }
-
 
 
 #########--------------------------------------------------------------#########
 #################################### MODEL #####################################
 #########--------------------------------------------------------------#########
 
-
-
-
 ## settings
-nc <- 30 # current control size
 nt <- 29 # current treatment size
 nh <- c(20, 25, 29, 24) # historical control size
 sigc <- 0.153 # control sd
 sigt <- 0.17 # treatment sd
 sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
-ut <- 1.08 + 1.33
-uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45)
-res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
-res1$plot_density
 
 final_df <- NULL
-delta1 <- seq(-1, 1, 0.1)
-delta2 <- seq(-1, 1, 0.1)
-for (i in delta1){
-  print(i)
-  for (j in delta2){
-    ut <- 1.08 + 1.33 + i
-    set.seed(42)
-    uh <-  c(1.24 + 1.62, 1.21 + 1.2, 1.05 + 1.73, 1.18 + 1.45) + rnorm(4, j, 0.05)
-    res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
-    temp_df <- data.frame(delta1 = i, delta2 = j, pow = res1$prob_rej, ess = res1$EHSS)
-    final_df <- rbind(final_df, temp_df)
+delta1 <- seq(0, 1, 0.1)
+delta2 <- seq(0, 1, 0.1)
+nc_seq <- seq(3, 30, 3)
+for (nc in nc_seq){
+  for (i in delta1){
+    cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
+    for (j in delta2){
+      ut <- uc + i
+      set.seed(42)
+      uh <-  rep(uc, 4) + rnorm(4, j, 0.05)
+      res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
+      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$prob_rej, ess = res1$EHSS)
+      final_df <- rbind(final_df, temp_df)
+    }
   }
 }
 
-write.csv(final_df, "results/normalized_results.csv")
 
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-
-final_df <- read.csv("results/normalized_results.csv")
-library(plotly)
-
-# ESS
-delta1 <- seq(-1, 1, length.out = 21)
-delta2 <- seq(-1, 1, length.out = 21)
-ess <- matrix(final_df$ess, nrow = 21, ncol = 21, byrow = TRUE)
-plot_ly(
-  x = ~delta2, y = ~delta1, z = ~ess,
-  type = 'surface'
-) %>% layout(
-  scene = list(
-    xaxis = list(title = "Delta 2"),
-    yaxis = list(title = "Delta 1"),
-    zaxis = list(title = "ESS")
-  ),
-  title = "3D Plot of ESS vs Delta1 and Delta2"
-)
-plot_ly(
-  x = ~delta2, y = ~delta1, z = ~ess,
-  type = 'heatmap'
-) %>% layout(
-  scene = list(
-    xaxis = list(title = "Delta 2"),
-    yaxis = list(title = "Delta 1"),
-    zaxis = list(title = "ESS")
-  ),
-  title = "3D Plot of ESS vs Delta1 and Delta2"
-)
-
-
-# Power
-pow <- matrix(final_df$pow, nrow = 21, ncol = 21, byrow = TRUE)
-plot_ly(
-  x = ~delta2, y = ~delta1, z = ~pow,
-  type = 'surface'
-)  %>% layout(
-  scene = list(
-    xaxis = list(title = "Delta 2"),
-    yaxis = list(title = "Delta 1"),
-    zaxis = list(title = "Power")
-  ),
-  title = "3D Plot of Power vs Delta1 and Delta2"
-)
-plot_ly(
-  x = ~delta2, y = ~delta1, z = ~pow,
-  type = 'heatmap'
-) %>% layout(
-  scene = list(
-    xaxis = list(title = "Delta 2"),
-    yaxis = list(title = "Delta 1"),
-    zaxis = list(title = "Power")
-  ),
-  title = "3D Plot of Power vs Delta1 and Delta2"
-)
-
-
-
-
+write.csv(final_df, "results/commensurate_results_nc.csv")
 

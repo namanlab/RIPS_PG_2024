@@ -40,7 +40,11 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
 
 get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   
-  a0 <- 0.5
+  xcc <- xc[which(Xc[,pc] == 1)]
+  ncc <- length(xcc)
+  gt <- getGT(xcc, xh, ncc, nh, N, pc)
+  
+  a0 <- gt
   
   # Logit and inverse logit functions
   logit <- function(p) log(p / (1 - p))
@@ -82,6 +86,42 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   sigma2_samples <- exp(samples[, pc + 1])
   tau2_samples <- inv_logit(samples[, pc + 2])
   list(prost_samples = mu_samples)
+}
+
+
+decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
+  set.seed(1)
+  u0 <- mean(x0)
+  sig0 <- sd(x0)
+  mc <- c(u0, u0 + gamma,  u0 - gamma)
+  t <- matrix(NA, R, length(mc))
+  for (i in 1:R) {
+    for (j in 1:length(mc)) {
+      xc <- rnorm(nc, mc[j], sig0)
+      sp <- ((n0-1)*sig0^2 + (nc-1)*var(xc))/(n0 + nc - 2) # pooled variance
+      t[i,j] <- max(n0, nc)^(-1/4)*abs(u0-mean(xc))/(sqrt(sp/n0 + sp/nc))
+    }
+  }
+  quant1 <- quantile(t[,1], q1)
+  quant2 <- quantile(t[,2], q2)
+  quant3 <- quantile(t[,3], q2)
+  KS_homo <- quant1
+  KS_hete <- min(quant2, quant3)
+  b <- log((1-large)*small/((1-small)*large))/((log(KS_homo))^c-(log(KS_hete))^c)
+  a <- log((1-large)/large)-b*(log(KS_homo))^c
+  return(list(a=a, b=b, c=c))
+}
+
+getGT <- function(xc, xh, nc, nh, N, pc){
+  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
+  a <- params$a 
+  b <- params$b 
+  c <- params$c
+  # calculate statistic and g(t)
+  sp <- ((nh-1)*var(xh) + (nc-1)*var(xc))/(nh + nc - 2) # pooled variance
+  cong_measure <- max(nh, nc)^(-1/4)*abs(mean(xh)-mean(xc))/(sqrt(sp/nh + sp/nc))
+  gt <- 1/(1 + exp(a + b*(log(cong_measure))^c))
+  return(gt)
 }
 
 
