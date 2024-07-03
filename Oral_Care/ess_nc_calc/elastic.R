@@ -233,7 +233,7 @@ uc <- 1.26 + 1.33 # true mean of control
 final_df <- NULL
 delta1 <- seq(0, 1, 0.1)
 delta2 <- seq(0, 1, 0.1)
-nc_seq <- seq(3, 30, 3)
+nc_seq <- seq(5, 30, 5)
 for (nc in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
