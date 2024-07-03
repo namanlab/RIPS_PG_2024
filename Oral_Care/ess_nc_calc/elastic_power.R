@@ -223,13 +223,14 @@ sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
 uc <- 1.26 + 1.33 # true mean of control
 
 final_df <- NULL
-delta1 <- seq(0, 0.5, 0.05)
-delta2 <- seq(0, 0.5, 0.05)
+delta1 <- seq(0, 0.2, 0.02)
+delta2 <- seq(0, 0.2, 0.02)
 nc_seq <- seq(5, 30, 5)
 for (nc in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
     for (j in delta2){
+      print(j)
       ut <- uc + i
       set.seed(42)
       uh <-  rep(uc, 4) + rnorm(4, j, 0.05)
