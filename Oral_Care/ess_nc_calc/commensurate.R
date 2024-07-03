@@ -22,6 +22,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   point_est <- NULL # point estimator based on control prior
   xc_act <- NULL # actual control samples
   xc_samp <- NULL # samples based on posterior predictive
+  pow <- NULL
   
   # for plot of distributions (only calculated in last sim)
   distr_plot_prost <- NULL
@@ -49,6 +50,7 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
     # METRICS:
     # probability that treatment is superior to control
     pp <- mean(mut <= muc)
+    pow <- c(pow, pp)
     # number of rejections of null
     if(pp >= cutoff){
       rej_null <- rej_null + 1
@@ -109,7 +111,8 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
               bias_point_est = bias_point_est, var_point_est = var_point_est, 
               mse_point_est = mse_point_est,
               time_diff = timeend - timestart, 
-              plot_comp = plot_comp, plot_density = plot_density))
+              plot_comp = plot_comp, plot_density = plot_density,
+              pow = mean(pow, na.rm = T)))
   
 }
 
@@ -215,7 +218,7 @@ for (nc in nc_seq){
       set.seed(42)
       uh <-  rep(uc, 4) + rnorm(4, j, 0.05)
       res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
-      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$prob_rej, ess = res1$EHSS)
+      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$pow, ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
     }
   }
