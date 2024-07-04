@@ -8,14 +8,15 @@ library(plotly)
 
 # Sample data to use in the visualizations
 data_elastic_power <- read.csv("results/elastic_power_results_nc.csv")
-data_elastic <- read.csv("results/elastic_power_results_nc.csv")
+data_elastic <- read.csv("results/elastic_results_nc.csv")
 data_commensurate <- read.csv("results/commensurate_results_nc.csv")
-data_normalized <- read.csv("results/elastic_power_results_nc.csv")
+data_normalized <- read.csv("results/normalized_results_nc.csv")
 data_rmap <- read.csv("results/rMAP_results_nc.csv")
 
+# 🥺
 # Define UI
 ui <- dashboardPage(
-  dashboardHeader(title = "No Free Lunch 🥺"),
+  dashboardHeader(title = "BDB Analysis"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Elastic", tabName = "elastic", icon = icon("dashboard")),
