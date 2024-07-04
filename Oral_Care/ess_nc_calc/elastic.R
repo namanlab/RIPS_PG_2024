@@ -183,6 +183,7 @@ decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
   return(list(a=a, b=b, c=c))
 }
 
+
 #-----Function to sample posterior of mean value for control arm------------#
 # Inputs:
 # x0: historical data
@@ -215,6 +216,25 @@ sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000){
   }
   return(list(muc_post=muc_post))
 }
+
+# vectorized:
+sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000) {
+  mean_x0 <- mean(x0)
+  var_x0 <- var(x0)
+  mean_xc <- mean(xc)
+  var_xc <- var(xc)
+  D <- var_x0 / (n0 * gt)
+  alpha <- (1 + nc) / 2
+  muc <- rep(mean_xc, sim)
+  beta <- nc * (var_xc + (mean_xc - muc)^2) / 2
+  sig <- rinvgamma(sim, alpha, beta)
+  mu <- (nc * mean_xc * D + sig * mean_x0) / (nc * D + sig)
+  var <- sig * D / (D * nc + sig)
+  muc <- rnorm(sim, mu, sqrt(var))
+  muc_post <- muc[(nburn + 1):sim]
+  return(list(muc_post = muc_post))
+}
+
 
 #########--------------------------------------------------------------#########
 #################################### MODEL #####################################

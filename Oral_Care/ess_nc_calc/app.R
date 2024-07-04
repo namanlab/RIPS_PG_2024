@@ -11,7 +11,7 @@ data_elastic_power <- read.csv("results/elastic_power_results_nc.csv")
 data_elastic <- read.csv("results/elastic_power_results_nc.csv")
 data_commensurate <- read.csv("results/commensurate_results_nc.csv")
 data_normalized <- read.csv("results/elastic_power_results_nc.csv")
-data_rmap <- read.csv("results/elastic_power_results_nc.csv")
+data_rmap <- read.csv("results/rMAP_results_nc.csv")
 
 # Define UI
 ui <- dashboardPage(
