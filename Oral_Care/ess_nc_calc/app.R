@@ -11,6 +11,7 @@ data_elastic_power <- read.csv("results/elastic_power_results_nc.csv")
 data_elastic <- read.csv("results/elastic_power_results_nc.csv")
 data_commensurate <- read.csv("results/elastic_power_results_nc.csv")
 data_normalized <- read.csv("results/elastic_power_results_nc.csv")
+data_rmap <- read.csv("results/elastic_power_results_nc.csv")
 
 # Define UI
 ui <- dashboardPage(
@@ -21,6 +22,7 @@ ui <- dashboardPage(
       menuItem("Elastic", tabName = "elastic", icon = icon("dashboard")),
       menuItem("Normalized Power", tabName = "normalized_power", icon = icon("dashboard")),
       menuItem("Commensurate Power", tabName = "commensurate_power", icon = icon("dashboard")),
+      menuItem("Robust MAP", tabName = "robust_map", icon = icon("dashboard")),
       selectInput("nc", "Select nc:", choices = unique(data_elastic_power$nc)),
       sliderInput("delta1", "Select delta1:", min = 0, max = 0.2, value = 0.1, step = 0.02),
       sliderInput("delta2", "Select delta2:", min = 0, max = 0.2, value = 0.1, step = 0.02),
@@ -68,6 +70,16 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(plotlyOutput("scatter3dCommensuratePower"), width = 12)
+              )
+      ),
+      tabItem(tabName = "robust_map",
+              h3("Robust MAP Method"),
+              fluidRow(
+                box(plotlyOutput("tilePlotRMAP"), width = 6),
+                box(plotlyOutput("lineChartRMAP"), width = 6)
+              ),
+              fluidRow(
+                box(plotlyOutput("scatter3dRMAP"), width = 12)
               )
       )
     )
@@ -144,6 +156,10 @@ server <- function(input, output, session) {
   output$tilePlotCommensuratePower <- renderPlotly({ render_tile_plot(data_commensurate, input$var, "Commensurate Power Method") })
   output$lineChartCommensuratePower <- renderPlotly({ render_line_chart(data_commensurate, input$var) })
   output$scatter3dCommensuratePower <- renderPlotly({ render_scatter3d(data_commensurate, input$var) })
+  
+  output$tilePlotRMAP <- renderPlotly({ render_tile_plot(data_rmap, input$var, "Robust MAP Method") })
+  output$lineChartRMAP <- renderPlotly({ render_line_chart(data_rmap, input$var) })
+  output$scatter3dRMAP <- renderPlotly({ render_scatter3d(data_rmap, input$var) })
 }
 
 # Run the application 
