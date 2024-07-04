@@ -9,17 +9,17 @@ library(plotly)
 # Sample data to use in the visualizations
 data_elastic_power <- read.csv("results/elastic_power_results_nc.csv")
 data_elastic <- read.csv("results/elastic_power_results_nc.csv")
-data_commensurate <- read.csv("results/elastic_power_results_nc.csv")
+data_commensurate <- read.csv("results/commensurate_results_nc.csv")
 data_normalized <- read.csv("results/elastic_power_results_nc.csv")
 data_rmap <- read.csv("results/elastic_power_results_nc.csv")
 
 # Define UI
 ui <- dashboardPage(
-  dashboardHeader(title = "Respected Honourable Dr. Wang: Free Lunch Please 🥺"),
+  dashboardHeader(title = "No Free Lunch 🥺"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Elastic Power", tabName = "elastic_power", icon = icon("dashboard")),
       menuItem("Elastic", tabName = "elastic", icon = icon("dashboard")),
+      menuItem("Elastic Power", tabName = "elastic_power", icon = icon("dashboard")),
       menuItem("Normalized Power", tabName = "normalized_power", icon = icon("dashboard")),
       menuItem("Commensurate Power", tabName = "commensurate_power", icon = icon("dashboard")),
       menuItem("Robust MAP", tabName = "robust_map", icon = icon("dashboard")),

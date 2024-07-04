@@ -124,11 +124,11 @@ get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
 
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
-  # gt <- get_GT(xc, xh, nc, nh, H, N)
-  
   # Logit and inverse logit functions
   logit <- function(p) log(p / (1 - p))
   inv_logit <- function(x) exp(x) / (1 + exp(x))
+  prob_w <- pnorm(mean(xc), mean = mean(xh), sd = sd(xh)/sqrt(nh))
+  w = 2*min(prob_w, 1 - prob_w)
   
   # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
@@ -138,8 +138,6 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     # Likelihood
     log_lik_current <- sum(dnorm(xc, mu, sqrt(sigma2), log = TRUE))
     log_lik_hist <- dnorm(mean(xh), mu, sd(xh)/sqrt(nh))
-    prob_w <- pnorm(mean(xc), mean = mean(xh), sd = sd(xh)/sqrt(nh))
-    w = min(prob_w, 1 - prob_w)
     log_lik_theta_hist <- log(w*log_lik_hist + (1 - w))
     
     # Prior distributions
@@ -160,9 +158,9 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   init_values <- c(mean(xc), log(var(xc)))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   R.utils::captureOutput(expr={
-  samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
-                          mcmc = N, burnin = 1000, thin = 1, force.samp = T,
-                          optim.method = "Nelder-Mead")
+    samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
+                             mcmc = N, burnin = 1000, thin = 1, force.samp = T,
+                             optim.method = "Nelder-Mead")
   })
   # Extract posterior samples for mu, sigma, a0, theta0, and tau
   mu_samples <- samples[, 1]
@@ -174,42 +172,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   list(prost_samples = mu_samples, ess = ess, mss = mean(sigma_samples))
 }
 
-get_GT <- function(xc, xh, nc, nh, H, N){
-  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 5000)
-  a <- params$a 
-  b <- params$b 
-  c <- params$c
-  # calculate statistic and g(t)
-  sp <- ((nh-1)*var(xh) + (nc-1)*var(xc))/(nh + nc - 2) # pooled variance
-  cong_measure <- max(nh, nc)^(-1/4)*abs(mean(xh)-mean(xc))/(sqrt(sp/nh + sp/nc))
-  gt <- 1/(1 + exp(a + b*(log(cong_measure))^c))
-  if(gt == 0) gt <- 0.00001 # numerical stability
-  return(gt)
-}
 
-
-decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
-  set.seed(1)
-  u0 <- mean(x0)
-  sig0 <- sd(x0)
-  mc <- c(u0, u0 + gamma,  u0 - gamma)
-  t <- matrix(NA, R, length(mc))
-  for (i in 1:R) {
-    for (j in 1:length(mc)) {
-      xc <- rnorm(nc, mc[j], sig0)
-      sp <- ((n0-1)*sig0^2 + (nc-1)*var(xc))/(n0 + nc - 2) # pooled variance
-      t[i,j] <- max(n0, nc)^(-1/4)*abs(u0-mean(xc))/(sqrt(sp/n0 + sp/nc))
-    }
-  }
-  quant1 <- quantile(t[,1], q1)
-  quant2 <- quantile(t[,2], q2)
-  quant3 <- quantile(t[,3], q2)
-  KS_homo <- quant1
-  KS_hete <- min(quant2, quant3)
-  b <- log((1-large)*small/((1-small)*large))/((log(KS_homo))^c-(log(KS_hete))^c)
-  a <- log((1-large)/large)-b*(log(KS_homo))^c
-  return(list(a=a, b=b, c=c))
-}
 
 
 #########--------------------------------------------------------------#########
@@ -243,10 +206,10 @@ for (nc in nc_seq){
       
       # Checkpointing
       if (nrow(final_df) %% 150 == 0) {
-        write.csv(final_df, file = paste0("results/elastic_power_checkpoint_nc_", nrow(final_df), ".csv"))
+        write.csv(final_df, file = paste0("results/rMAP_checkpoint_nc_", nrow(final_df), ".csv"))
       }
     }
   }
 }
 
-write.csv(final_df, "results/elastic_power_results_nc.csv")
+write.csv(final_df, "results/rMAP_results_nc.csv")
