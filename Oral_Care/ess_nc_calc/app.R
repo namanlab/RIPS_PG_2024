@@ -5,17 +5,19 @@ library(tidyverse)
 library(e1071)
 library(stringr)
 library(plotly)
+library(reshape2)
 
 # Sample data to use in the visualizations
 data_elastic_power <- read.csv("results/elastic_power_results_nc.csv")
-data_elastic <- read.csv("results/elastic_power_results_nc.csv")
+data_elastic <- read.csv("results/elastic_results_nc.csv")
 data_commensurate <- read.csv("results/commensurate_results_nc.csv")
-data_normalized <- read.csv("results/elastic_power_results_nc.csv")
+data_normalized <- read.csv("results/normalized_results_nc.csv")
 data_rmap <- read.csv("results/rMAP_results_nc.csv")
 
+# 🥺
 # Define UI
 ui <- dashboardPage(
-  dashboardHeader(title = "No Free Lunch 🥺"),
+  dashboardHeader(title = "BDB Analysis"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Elastic", tabName = "elastic", icon = icon("dashboard")),
@@ -30,7 +32,7 @@ ui <- dashboardPage(
     )
   ),
   dashboardBody(
-    withMathJax(), # Ensure MathJax is included
+    withMathJax(),
     tabItems(
       tabItem(tabName = "elastic_power",
               h3("Elastic Power Method"),
@@ -138,6 +140,44 @@ server <- function(input, output, session) {
         yaxis = list(title = TeX("delta_2")),
         zaxis = list(title = 'Power')
       ))
+    fig
+  }
+  
+  render_surface3d <- function(data, var) {
+    fill_var <- switch(var, "Pow1" = "pow1", "Pow2" = "pow2", "PESS" = "ess")
+    df_cur <- data
+    
+    # Initialize the plotly figure
+    fig <- plot_ly()
+    
+    # Loop through each unique ess value and add a surface
+    unique_ess <- unique(df_cur$ess)
+    for (ess_value in unique_ess) {
+      group_data <- subset(df_cur, ess == ess_value)
+      
+      # Create a matrix for z values
+      z_matrix <- acast(group_data, delta2 ~ delta1, value.var = fill_var)
+      
+      fig <- fig %>%
+        add_surface(
+          x = unique(group_data$delta1), 
+          y = unique(group_data$delta2), 
+          z = z_matrix, 
+          colorscale = viridis::viridis(256),
+          showscale = FALSE,
+          name = paste("ESS", ess_value)
+        )
+    }
+    
+    # Add layout and axis labels
+    fig <- fig %>%
+      layout(scene = list(
+        xaxis = list(title = TeX("delta_1")),
+        yaxis = list(title = TeX("delta_2")),
+        zaxis = list(title = 'Power'),
+        legend = list(title = list(text = 'ESS'))
+      ))
+    
     fig
   }
   
