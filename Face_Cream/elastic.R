@@ -1,3 +1,9 @@
+# N = 5000
+# Modify Xc gen
+# change initialization
+# run simulation change
+# calc ess
+
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
@@ -10,6 +16,17 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
   set.seed(42)
   xh <- rnorm(nh, uh, sqrt(sig^2 + tau^2))
   power <- 0
+  ess <- NULL # effective sample size
+  timestart <- Sys.time() # computation time
+  quantile_interval_count <- 0 # number of times muc is in quantile interval
+  width_quantile_interval <- NULL # width of credible interval
+  point_est <- NULL # point estimator based on control prior
+  
+  # distrn:
+  distr_bf <- NULL
+  distr_at <- NULL
+  
+  pc <- ncol(Xc)
   
   for(trial in 1:R){
     
@@ -18,22 +35,77 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
     overall_noise <- rnorm(2*nc, 0, sig^2)
     indiv_noise <- rnorm(nc, 0, tau^2)
     xc <- Xc %*% uc + Zc %*% indiv_noise + overall_noise
-    pc <- ncol(Xc)
     
     # posterior for control arm -- TO CHANGE DEPENDING ON METHOD
     res_inter <- get_control_prost(Xc, Zc, xc, xh, nc, nh, N, pc)
     muc <- res_inter$prost_samples
-    print(apply(muc, 2, mean))
+    
     res <- 0
     for (i in 1:(pc - 1)){
       curv = mean(muc[,i] <= muc[,pc])
+      curv = max(curv, 1 - curv) # 2 sided
       res <- res + ifelse(curv >= cutoff, 1, 0)
     }
     power <- power + ifelse(res == pc - 1, 1, 0)
-    print(power)
+    
+    # effective sample size:
+    ess <- c(ess, res_inter$ess)
+    
+    # Count if the true value is within the quantile interval
+    quantile_interval <- quantile(muc[,pc], probs = c(0.025, 0.975))
+    quantile_interval_count <- quantile_interval_count + 
+      ifelse((quantile_interval[1] <= uc[pc]) && (quantile_interval[2] >= uc[pc]), 1, 0)
+    # Width of the quantile interval
+    width_quantile_interval <- c(width_quantile_interval, 
+                                 quantile_interval[2] - quantile_interval[1])
+    # point estimator
+    val_point_est <- mean(muc[,pc])
+    point_est <- c(point_est, val_point_est)
+    
+    # distrns
+    if (trial == R){
+      distr_at <- muc
+      distr_bf <- matrix(rep(0, N*pc), nrow = N)
+      for (i in 1:pc){
+        xt_cur = xc[which(Xc[,i] == 1)]
+        t.par1 <- mean(xt_cur)
+        t.par2 <- var(xt_cur)/length(xt_cur)
+        distr_bf[,i] <- rst(N, t.par1, sqrt(t.par2), length(xt_cur) - 1)
+      }
+    }
   }
-  cat("Power:", power/R)
+  timeend <- Sys.time()
+  EHSS <- mean(ess)
+  quantile_interval_count_mean <-  quantile_interval_count/R
+  bias_point_est <- mean(point_est) - uc[pc]
+  var_point_est <- var(point_est)
+  mse_point_est <- bias_point_est^2 + var_point_est
+  width_quantile_interval_mean <- mean(width_quantile_interval)
+  cat("Power", power/R, "\n")
+  cat("effective historical sample size is", formatC(EHSS, digits = 2, format = "f"), sep = " ", "\n")
+  cat("Mean Width of Credible Interval for Control Prior", formatC(width_quantile_interval_mean, digits = 4, format = "f"), sep = " ", "\n")
+  cat("% of times muc is in quantile interval is", formatC(quantile_interval_count_mean*100, digits = 4, format = "f"), sep = " ", "\n")
+  cat("Bias of point estiamtor based on control prior", formatC(bias_point_est, digits = 4, format = "f"), sep = " ", "\n")
+  cat("Variance value of point estiamtor based on control prior", formatC(var_point_est, digits = 4, format = "f"), sep = " ", "\n")
+  cat("MSE of point estiamtor based on control prior", formatC(mse_point_est, digits = 4, format = "f"), sep = " ", "\n")
+  cat("total time for", R, "simulations is", formatC(timeend - timestart, digits = 4, format = "f"), sep = " ", "\n")
   
+  df_plot <- NULL
+  for (i in 1:pc){
+    cur_df <- tibble(Before = distr_bf[,i], After = distr_at[,i]) %>% 
+      pivot_longer(1:2, names_to = "type", values_to = "val") 
+    cur_df$p = i
+    df_plot <- rbind(df_plot, cur_df)
+  }
+  
+  return(list(power = power/R,
+              EHSS = EHSS, 
+              width_quantile_interval_mean = width_quantile_interval_mean, 
+              quantile_interval_count_mean = quantile_interval_count_mean,
+              bias_point_est = bias_point_est, var_point_est = var_point_est, 
+              mse_point_est = mse_point_est,
+              time_diff = timeend - timestart, 
+              distr_df = df_plot))
 }
 
 
@@ -72,7 +144,9 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
     return(log_post)
   }
   
-  init_values <- c(rep(0, pc), log(1), log(1))  # Initial values for MCMC sampling
+  init_mu <- rep(0, pc)
+  for (i in 1:pc){init_mu[i] <- mean(xc[which(Xc[,i] == 1)])}
+  init_values <- c(init_mu, log(1), log(1))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
                            mcmc = N, burnin = 1000, thin = 1, force.samp = T,
@@ -82,7 +156,7 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   mu_samples <- samples[, 1:pc]
   sigma2_samples <- exp(samples[, pc + 1])
   tau2_samples <- inv_logit(samples[, pc + 2])
-  list(prost_samples = mu_samples)
+  list(prost_samples = mu_samples, ess = gt*nh)
 }
 
 decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
@@ -109,7 +183,7 @@ decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
 }
 
 getGT <- function(xc, xh, nc, nh, N, pc){
-  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 50000)
+  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 5000)
   a <- params$a 
   b <- params$b 
   c <- params$c
@@ -136,25 +210,158 @@ gen_Z <- function(n){
   return(res)
 }
 
-gen_X <- function(n, p){
-  res <- diag(p)
-  for (i in 1:ceiling(2*n/p)){
-    res <- rbind(res, diag(p))
+gen_X <- function(n, p, num_ones_last_col) {
+  # Validate the num_ones_last_col argument
+  if (num_ones_last_col < 0 || num_ones_last_col > 2 * n) {
+    stop("num_ones_last_col should be between 0 and 2 * n.")
   }
-  res <- res[1:(2*n), ]
+  
+  # Initialize the result matrix
+  res <- matrix(0, nrow = 2 * n, ncol = p)
+  pairs_c <- t(combn(1:p, 2))
+  num_pairs <- nrow(pairs_c)
+  
+  # Generate pairs normally
+  for (i in 1:n) {
+    pair_idx <- (i %% num_pairs) + 1
+    res[2 * i - 1, pairs_c[pair_idx, 1]] <- 1
+    res[2 * i, pairs_c[pair_idx, 2]] <- 1
+  }
+  
+  # Adjust the last column to have exactly num_ones_last_col 1s
+  current_ones_last_col <- sum(res[, p])
+  if (current_ones_last_col > num_ones_last_col) {
+    # Too many 1s, remove some
+    ones_indices <- which(res[, p] == 1)
+    to_remove <- sample(ones_indices, current_ones_last_col - num_ones_last_col)
+    res[to_remove, p] <- 0
+    
+    # Replace the removed 1s with 1s in other columns
+    set.seed(42)
+    for (idx in to_remove) {
+      paired_row <- ifelse(idx %% 2 == 1, idx + 1, idx - 1)
+      possible_cols <- setdiff(1:(p-1), which(res[paired_row, ] == 1))
+      replace_with_col <- ifelse(length(possible_cols) == 1, possible_cols, sample(possible_cols, 1))
+      res[idx, replace_with_col] <- 1
+    }
+  } 
+  
   return(res)
 }
 
 ## settings
-nc <- 45
+nc <- 99
 pc <- 3
 uc <- c(2.41, 2.45, 2.59)
 Zc <- gen_Z(nc)
 Xc <- gen_X(nc, pc)
 sig = 0.2
-tau = 0.2
 uh = 2.67
 nh = 50
-run_simulation(sig, tau, uh, nh, uc, Xc, Zc, 10000, 100, 0.95)
+run_simulation(sig, 0.1, uh, nh, uc, Xc, Zc, 5000, 5, 0.95)
+
+final_df_1 <- NULL
+final_df_2 <- NULL
+
+for (i in seq(0, 0.4, 0.02)){
+  cat("\n==========\nTau:", i, "\n==========\n")
+  res <- run_simulation(sig, i, uh, nh, uc, Xc, Zc, 5000, 5, 0.95)
+  temp_df_1 = data.frame(tau = i, pow = res$power, ess = res$EHSS, mse = res$mse_point_est)
+  final_df_1 <- rbind(final_df_1, temp_df_1)
+  temp_df_2 <- res$distr_df
+  temp_df_2$tau = i
+  final_df_2 <- rbind(final_df_2, temp_df_2)
+}
+
+write.csv(final_df_1, "results/elastic_results_tau1.csv")
+write.csv(final_df_2, "results/elastic_results_tau2.csv")
+
+
+final_df_2 %>% 
+  filter(p == 1, tau %% 0.1 == 0) %>%
+  ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
+   facet_wrap(~tau, nrow = 3, scales = "free_x") + theme_bw() +
+   labs(fill = "Type")
+
+
+final_df <- NULL
+delta1 <- seq(0, 0.2, 0.02)
+delta2 <- seq(0, 0.2, 0.02)
+nc_seq <- seq(5, 35, 5)
+for (nc in nc_seq){
+  for (i in delta1){
+    cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
+    for (j in delta2){
+      set.seed(42)
+      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, delta1, 0.05), 0)
+      temp_uh <-  2.6 + delta2
+      temp_Xc <- modXc(Xc, nc)
+      res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
+      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$power, 
+                            ess = res1$EHSS)
+      final_df <- rbind(final_df, temp_df)
+      
+      # Checkpointing
+      if (nrow(final_df) %% 150 == 0) {
+        write.csv(final_df, file = paste0("results/elastic_checkpoint_nc_", nrow(final_df), ".csv"))
+      }
+    }
+  }
+}
+
+write.csv(final_df, "results/elastic_results_nc_fc.csv")
+
+
+
+gen_X <- function(n, p, prop) {
+  # Validate the prop argument
+  if(length(prop) != p || any(prop < 0) || any(prop > 1) || abs(sum(prop) - 1) > .Machine$double.eps^0.5) {
+    stop("prop should be a vector of length p, with values between 0 and 1, summing to 1.")
+  }
+  
+  # Initialize the result matrix
+  res <- matrix(0, nrow = 2 * n, ncol = p)
+  pairs_c <- t(combn(1:p, 2))
+  num_pairs <- nrow(pairs_c)
+  
+  # Calculate the number of pairs to assign based on proportions
+  row_counts <- round(n * prop)
+  print(row_counts)
+  
+  # Ensure the sum of row_counts is exactly n
+  while (sum(row_counts) < n) {
+    diff_idx <- which.max(prop - row_counts / n)
+    row_counts[diff_idx] <- row_counts[diff_idx] + 1
+  }
+  while (sum(row_counts) > n) {
+    diff_idx <- which.min(prop - row_counts / n)
+    row_counts[diff_idx] <- row_counts[diff_idx] - 1
+  }
+  print((row_counts))
+  
+  current_row <- 1
+  for (col_index in 1:p) {
+    col_pairs <- pairs_c[apply(pairs_c, 1, function(row) col_index %in% row), ]
+    if (is.vector(col_pairs)) col_pairs <- matrix(col_pairs, ncol = 2)
+    
+    for (i in 1:row_counts[col_index]) {
+      pair_idx <- (i %% nrow(col_pairs)) + 1
+      res[current_row, col_pairs[pair_idx, 1]] <- 1
+      res[current_row + 1, col_pairs[pair_idx, 2]] <- 1
+      current_row <- current_row + 2
+    }
+  }
+  return(res)
+}
+
+a = gen_X(nc, pc, 11)
+apply(a, 1, sum)
+apply(a, 2, sum)
+t2 <- 0
+for (i in 1:nc){ifelse(all(a[2*i - 1, ] == a[2*i,]), t2 <- t2 + 1, t2 <- t2 + 0)}
+print(t2)
+
+
+
 
 
