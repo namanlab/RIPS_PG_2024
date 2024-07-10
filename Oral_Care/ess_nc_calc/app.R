@@ -99,8 +99,8 @@ server <- function(input, output, session) {
     if (var == "PESS"){color_scale <- scale_fill_gradient(low = "lightblue", high = "darkblue")}
     else {color_scale <- scale_fill_gradient(low = "red", high = "green", limits = c(0, 1))}
     p_cur <- ggplot(df_cur, aes(x = delta1, y = delta2, fill = !!sym(fill_var))) +
-      labs(x = TeX("$\\delta_1 = \\mu_t - \\mu_c$"), 
-           y = TeX("$\\delta_2 = \\mu_h - \\mu_c$"),
+      labs(x = TeX("$\\delta_1 = \\theta_t - \\theta_c$"), 
+           y = TeX("$\\delta_2 = \\theta_h - \\theta_c$"),
            fill = fill_label) +
       color_scale +
       geom_tile() +
