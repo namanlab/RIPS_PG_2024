@@ -18,7 +18,6 @@ gen_Z <- function(n){
   bm <- diag(n)
   res <- matrix(rep(0, 2*n^2), nrow = 2*n)
   for (i in 1:(2*n)){
-    print(bm[floor(i/2),])
     res[i,] <- bm[ceiling(i/2),]
   }
   return(res)

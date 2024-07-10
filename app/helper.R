@@ -147,12 +147,35 @@ generate_result_ui <- function(method_name, bayesian_prob, frequentist_p_value) 
 
 
 # Helper function to read data from the uploaded file
-read_data_FC <- function(file) {
-  data <- read_excel(file)
-  yc <- data[[1]]
-  yt <- data[[2]]
-  yh <- as.vector(as.matrix(data[, 3:ncol(data)]))
-  list(yc = yc, yt = yt, yh = yh)
+read_data_FC <- function(file1, file2) {
+  
+  data <- read_excel(file1)
+  data[[1]] = as.numeric(as.factor(data[[1]]))
+  data[[2]] = as.numeric(as.factor(data[[2]]))
+  data[[3]] = as.numeric(as.factor(data[[3]]))
+  colnames(data) <- c("ids", "sides", "treat_grp", "y")
+  ids <- data[[1]]
+  sides <- data[[2]]
+  treat_grp <- data[[3]]
+  nc = length(unique(ids))
+  pc = length(unique(treat_grp))
+  Zc = gen_Z(nc)
+  Xc <- matrix(0, nrow = 2 * nc, ncol = pc)
+  xc <- rep(0, 2*nc)
+  for (i in 1:n) {
+    temp_df <- data %>% filter(ids == i) %>% arrange(sides)
+    cur_t <- temp_df %>% pull(treat_grp)
+    cur_y <- temp_df %>% pull(y)
+    Xc[2 * i - 1, cur_t[1]] <- 1
+    Xc[2 * i, cur_t[2]] <- 1
+    xc[2*i - 1] <- cur_y[1]
+    xc[2*i] <- cur_y[2]
+  }
+  
+  data_hist <- read_excel(file2)
+  xh <- as.vector(as.matrix(data[, 3:ncol(data_hist)]))
+  
+  list(Xc = Xc, Zc = Zc, xc = xc, xh = xh)
 }
 
 # Helper function to compute all Bayesian probabilities

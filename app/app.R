@@ -133,19 +133,46 @@ server <- function(input, output, session) {
   
   observeEvent(input$submit_FC, {
     req(input$datafile)
+    req(input$datafile_hist)
+    data <- read_data_FC(input$datafile$datapath, input$datafile_hist$datapath)
+    Zc <- data$Zc
+    Xc <- data$Xc
+    xh <- data$xh
+    xc <- data$xc
     
-    data <- read_data_FC(input$datafile$datapath)
-    nc <- 99
-    pc <- 3
-    uc <- c(2.41, 2.45, 2.59)
+    # Compute results for each method
+    bayesian_probs <- compute_bayesian_probs_FC(Xc, Zc, xc, xh, input$R_samples)
+    
+    output$results_elastic_FC <- renderUI({
+      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic)
+    })
+    
+  })
+  
+  observeEvent(input$simulate_FC, {
+    
+    nc <- input$n
+    pc <- input$p_feats
+    
+    uc_list <- lapply(1:pc, function(i) {
+      input[[paste0("mut_", i)]]
+    })
+    uc <- unlist(uc_list)
+    
     Zc <- gen_Z(nc)
-    Xc <- gen_X(nc, pc, round(2*nc/pc))
-    sig = 0.2
-    tau = 0.2
-    uh = 2.67
-    nh = 50
-    set.seed(42)
-    xh <- rnorm(nh, uh, sqrt(sig^2 + tau^2))
+    Xc <- gen_X(nc, pc, input$nc)
+    sig = sqrt(input$sigma2)
+    tau = sqrt(input$tau2)
+    
+    H <- input$H
+    yh_list <- lapply(1:H, function(i) {
+      muh <- input[[paste0("muh_", i)]]
+      sigma2_h <- input[[paste0("sigma2_h_", i)]]
+      nh <- input[[paste0("nh_", i)]]
+      rnorm(nh, muh, sqrt(sigma2_h))
+    })
+    xh <- unlist(yh_list)
+    
     overall_noise <- rnorm(2*nc, 0, sig^2)
     indiv_noise <- rnorm(nc, 0, tau^2)
     xc <- Xc %*% uc + Zc %*% indiv_noise + overall_noise
@@ -193,7 +220,13 @@ server <- function(input, output, session) {
     } else if (input$anal_type == "Import Data") {
       sidebarMenu(
         numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
-        fileInput("datafile", "Upload Excel File", accept = c(".xlsx")),
+        tags$div(title=paste0("Data Import Format\n\n",
+                              "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
+                              "1. First Column (yc): This column should contain the data for the control group (`yc`). Each value represents a sample from the control group.\n\n",
+                              "2. Second Column (yt): This column should contain the data for the treatment group (`yt`). Each value represents a sample from the treatment group.\n\n",
+                              "3. Subsequent Columns (yh1, yh2, ... yhn): These columns should contain data for the historical datasets (`yh`). Each column represents a separate historical dataset, with values representing samples from each respective dataset.\n"),
+          fileInput("datafile", "Upload Excel File", accept = c(".xlsx"))
+        ),
         actionButton("submit_OC", "Submit")
       )
     } else {
@@ -214,10 +247,11 @@ server <- function(input, output, session) {
   
   observe({
     H <- input$H
+    set.seed(42)
     output$historical_data_inputs <- renderUI({
       lapply(1:H, function(i) {
         tagList(
-          numericInput(paste0("muh_", i), paste0("Mean of yh_", i), value = 2.45),
+          numericInput(paste0("muh_", i), paste0("Mean of yh_", i), value = 2.45 + rnorm(1, 0, 0.05)),
           numericInput(paste0("sigma2_h_", i), paste0("Variance of yh_", i), value = 0.3),
           numericInput(paste0("nh_", i), paste0("Number of samples for yh_", i), value = 31),
           hr() # Optional: Adds a horizontal line to separate each set of inputs
@@ -243,12 +277,51 @@ server <- function(input, output, session) {
     } else if (input$anal_type == "Import Data") {
       sidebarMenu(
         numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
-        fileInput("datafile", "Upload Excel File", accept = c(".xlsx")),
+        tags$div(title=paste0("Data Import Format\n\n",
+                              "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
+                              "1. First Column (id): This column should contain the face id (unique identifier for the face/indivdual the sample comes from)\n\n",
+                              "2. Second Column (side): This column should contain either L (left) or R (right) denoting the side of the face from which the sample came.\n\n",
+                              "3. Third Column (treatment_grp): This column should contain the treatment id/name (unique identifier for the treatment/control applied on the sample)\n\n",
+                              "4. Fourth Column (y): This column should contain the measured value/observation (after adjusting for the baseline).\n\n"),
+                 fileInput("datafile", "Upload Excel File (Current Data)", accept = c(".xlsx"))
+        ), 
+        tags$div(title=paste0("Data Import Format\n\n",
+                              "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
+                              "1. Historical Data (yh1, yh2, ... yhn): These columns should contain data for the historical datasets (`yh`). Each column represents a separate historical dataset, with values representing samples from each respective dataset.\n"),
+                 fileInput("datafile_hist", "Upload Excel File (Historical Data)", accept = c(".xlsx"))
+        ),
         actionButton("submit_FC", "Submit")
       )
     } else {
-      sidebarMenu()
+      sidebarMenu(
+        numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
+        numericInput("p_feats", "Number of Treatments (Including Control)", value = 3, min = 3),
+        uiOutput("feature_data_inputs"),
+        numericInput("sigma2", "Between Sample variance", value = 0.2^2),
+        numericInput("tau2", "Within Sample Variance", value = 0.2^2),
+        numericInput("n", "Number of Samples", value = 99),
+        numericInput("nc", "Number of Control Faces", value = 29),
+        numericInput("H", "Number of historical datasets", value = 1, min = 1),
+        uiOutput("historical_data_inputs"),
+        actionButton("simulate_FC", "Simulate Data")
+      )
     }
+  })
+  
+  observe({
+    p <- input$p_feats
+    output$feature_data_inputs <- renderUI({
+      set.seed(42)
+      lapply(1:p, function(i) {
+        if (i == p){tagList(
+          numericInput(paste0("mut_", i), paste0("Mean of control"), value = 2.45 - rnorm(1, 0.1, 0.05)),
+          hr() # Optional: Adds a horizontal line to separate each set of inputs
+        )} else {tagList(
+          numericInput(paste0("mut_", i), paste0("Mean of treatment ", i), value = 2.4 + rnorm(1, 0, 0.05)),
+          hr() # Optional: Adds a horizontal line to separate each set of inputs
+        )}
+      })
+    })
   })
   
   
@@ -289,7 +362,6 @@ server <- function(input, output, session) {
       }
       
     } else {
-      
       if (input$anal_type == "Power Analysis") {
         navset_tab(
           nav_panel(
@@ -362,10 +434,6 @@ server <- function(input, output, session) {
   output$Plot2Elastic <- renderPlotly({ render_p2(data_elastic_tau_2, input$feature) })
   output$Plot3Elastic <- renderPlotly({ render_p3(data_elastic_tau_2, input$tau) })
   
-  output$Plot1NormalizedPower <- renderPlotly({ render_p1(data_normalized_tau_1, input$var) })
-  output$Plot2NormalizedPower <- renderPlotly({ render_p2(data_normalized_tau_2, input$feature) })
-  output$Plot3NormalizedPower <- renderPlotly({ render_p3(data_normalized_tau_2, input$tau) })
-  
   output$tilePlotElasticPower <- renderPlotly({ render_tile_plot(data_elastic_power, input$var, "Elastic Power Method", input$nc) })
   output$lineChartElasticPower <- renderPlotly({ render_line_chart(data_elastic_power, input$var, input$delta1, input$delta2) })
   output$scatter3dElasticPower <- renderPlotly({ render_scatter3d(data_elastic_power, input$var) })
@@ -389,10 +457,6 @@ server <- function(input, output, session) {
   output$tilePlotElasticFC <- renderPlotly({ render_tile_plot(data_elastic_fc, input$var, "Elastic Method", input$nc) })
   output$lineChartElasticFC <- renderPlotly({ render_line_chart(data_elastic_fc, input$var, input$delta1, input$delta2) })
   output$scatter3dElasticFC <- renderPlotly({ render_scatter3d(data_elastic_fc, input$var) })
-  
-  output$tilePlotNormalizedPowerFC <- renderPlotly({ render_tile_plot(data_elastic_fc, input$var, "Normalized Power Method", input$nc) })
-  output$lineChartNormalizedPowerFC <- renderPlotly({ render_line_chart(data_elastic_fc, input$var, input$delta1, input$delta2) })
-  output$scatter3dNormalizedPowerFC <- renderPlotly({ render_scatter3d(data_elastic_fc, input$var) })
   
 }
 
