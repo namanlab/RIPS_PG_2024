@@ -3,6 +3,7 @@ library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
+library(latex2exp)
 
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
