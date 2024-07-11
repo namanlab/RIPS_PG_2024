@@ -1,9 +1,3 @@
-# N = 5000
-# Modify Xc gen
-# change initialization
-# run simulation change
-# calc ess
-
 library(MCMCpack)
 library(LaplacesDemon)
 library(invgamma)
@@ -39,6 +33,7 @@ run_simulation <- function(sig, tau, uh, nh, uc, Xc, Zc, N, R, cutoff){
     # posterior for control arm -- TO CHANGE DEPENDING ON METHOD
     res_inter <- get_control_prost(Xc, Zc, xc, xh, nc, nh, N, pc)
     muc <- res_inter$prost_samples
+    print(apply(muc, 2, mean))
     
     res <- 0
     for (i in 1:(pc - 1)){
@@ -119,6 +114,15 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   logit <- function(p) log(p / (1 - p))
   inv_logit <- function(x) exp(x) / (1 + exp(x))
   
+  log_inverse_gamma <- function(sigma2) {
+    if (sigma2 > 0) {
+      return(dinvgamma(sigma2, shape = 2, scale = 2, log = TRUE))
+    } else {
+      return(-Inf)
+    }
+  }
+  
+  
   # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
     mu <- theta[1:pc]
@@ -130,13 +134,15 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
     log_lik_hist <- dnorm(mu[pc], mean(xh), sqrt((sigma2 + tau2)/(nh*gt)), log = T)
     
     # Prior distributions
-    log_prior_sigma <- -sigma2
-    log_prior_tau <- -tau2
+    log_prior_sigma <- log_inverse_gamma(sigma2)
+    log_prior_tau <- log_inverse_gamma(tau2)
+    # log_prior_sigma <- -sigma2
+    # log_prior_tau <- -tau2
     
     jacob_log <- log(sigma2) + log(tau2) 
     
     # Posterior
-    log_post <- log_lik_current + log_lik_hist + log_prior_sigma + log_prior_tau 
+    log_post <- log_lik_current + log_lik_hist + log_prior_sigma + log_prior_tau + jacob_log 
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
@@ -158,6 +164,7 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   tau2_samples <- inv_logit(samples[, pc + 2])
   list(prost_samples = mu_samples, ess = gt*nh)
 }
+
 
 decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
   set.seed(1)
@@ -252,116 +259,109 @@ gen_X <- function(n, p, num_ones_last_col) {
 ## settings
 nc <- 99
 pc <- 3
-uc <- c(2.41, 2.45, 2.59)
+uc <- c(2.6, 2.6, 2.6)
 Zc <- gen_Z(nc)
-Xc <- gen_X(nc, pc)
+Xc <- gen_X(nc, pc, round(2*nc/pc))
 sig = 0.2
-uh = 2.67
+uh = 2.6
 nh = 50
-run_simulation(sig, 0.1, uh, nh, uc, Xc, Zc, 5000, 5, 0.95)
-
-final_df_1 <- NULL
-final_df_2 <- NULL
-
-for (i in seq(0, 0.4, 0.02)){
-  cat("\n==========\nTau:", i, "\n==========\n")
-  res <- run_simulation(sig, i, uh, nh, uc, Xc, Zc, 5000, 5, 0.95)
-  temp_df_1 = data.frame(tau = i, pow = res$power, ess = res$EHSS, mse = res$mse_point_est)
-  final_df_1 <- rbind(final_df_1, temp_df_1)
-  temp_df_2 <- res$distr_df
-  temp_df_2$tau = i
-  final_df_2 <- rbind(final_df_2, temp_df_2)
-}
-
-write.csv(final_df_1, "results/elastic_results_tau1.csv")
-write.csv(final_df_2, "results/elastic_results_tau2.csv")
-
-
-final_df_2 %>% 
-  filter(p == 1, tau %% 0.1 == 0) %>%
+res = run_simulation(sig, 0.1, uh, nh, uc, Xc, Zc, 5000, 1, 0.95)
+res$distr_df %>%
   ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
-   facet_wrap(~tau, nrow = 3, scales = "free_x") + theme_bw() +
-   labs(fill = "Type")
+  facet_wrap(~p) +
+  theme_bw() +
+  labs(fill = "Type")
 
+## Tau Analysis:
+# final_df_1 <- NULL
+# final_df_2 <- NULL
+# 
+# for (i in seq(0, 0.4, 0.02)){
+#   cat("\n==========\nTau:", i, "\n==========\n")
+#   res <- run_simulation(sig, i, uh, nh, uc, Xc, Zc, 5000, 5, 0.95)
+#   temp_df_1 = data.frame(tau = i, pow = res$power, ess = res$EHSS, mse = res$mse_point_est)
+#   final_df_1 <- rbind(final_df_1, temp_df_1)
+#   temp_df_2 <- res$distr_df
+#   temp_df_2$tau = i
+#   final_df_2 <- rbind(final_df_2, temp_df_2)
+# }
+# 
+# write.csv(final_df_1, "results/elastic_results_tau1.csv")
+# write.csv(final_df_2, "results/elastic_results_tau2.csv")
+# 
+# 
+
+
+
+library(foreach)
+library(doParallel)
+library(doSNOW)
+
+numCores <- detectCores() - 2
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
 
 final_df <- NULL
 delta1 <- seq(0, 0.2, 0.02)
 delta2 <- seq(0, 0.2, 0.02)
 nc_seq <- seq(5, 35, 5)
-for (nc in nc_seq){
+checkpoint_interval <- 150  # Set your checkpoint interval here
+checkpoint_counter <- 0
+
+final_df <- foreach(nc_val = nc_seq, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %:%
+  foreach(i = delta1, .combine = rbind) %dopar% {
+    cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
+    temp_results <- foreach(j = delta2, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %dopar% {
+      set.seed(42)
+      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.05), 0)
+      temp_uh <-  2.6 + j
+      temp_Xc <- gen_X(nc, pc, nc_val)
+      res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
+      temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power, ess = res1$EHSS)
+      
+      # Return temp_df for combining
+      temp_df
+    }
+    
+    # Save checkpoint within the outer loop
+    checkpoint_counter <<- checkpoint_counter + nrow(temp_results)
+    if (checkpoint_counter >= checkpoint_interval) {
+      write.csv(temp_results, file = paste0("results/elastic_checkpoint_nc_", Sys.time(), ".csv"), row.names = FALSE)
+      checkpoint_counter <<- 0  # Reset the checkpoint counter
+    }
+    
+    temp_results  # Return the results for this iteration
+  }
+
+write.csv(final_df, "results/elastic_results_nc_fc.csv", row.names = FALSE)
+
+
+stopCluster(cl)
+
+
+
+
+final_final_df <- final_df
+final_df <- NULL
+delta1 <- seq(0, 0.2, 0.04)
+delta2 <- seq(0, 0.2, 0.04)
+nc_seq <- c(30)
+for (nc_val in nc_seq){
   for (i in delta1){
-    cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
+    cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
     for (j in delta2){
       set.seed(42)
-      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, delta1, 0.05), 0)
-      temp_uh <-  2.6 + delta2
-      temp_Xc <- modXc(Xc, nc)
+      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.05), 0)
+      temp_uh <-  2.6 + j
+      temp_Xc <- gen_X(nc, pc, nc_val)
       res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
-      temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow = res1$power, 
+      temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power,
                             ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
-      
-      # Checkpointing
-      if (nrow(final_df) %% 150 == 0) {
-        write.csv(final_df, file = paste0("results/elastic_checkpoint_nc_", nrow(final_df), ".csv"))
-      }
     }
   }
 }
 
-write.csv(final_df, "results/elastic_results_nc_fc.csv")
-
-
-
-gen_X <- function(n, p, prop) {
-  # Validate the prop argument
-  if(length(prop) != p || any(prop < 0) || any(prop > 1) || abs(sum(prop) - 1) > .Machine$double.eps^0.5) {
-    stop("prop should be a vector of length p, with values between 0 and 1, summing to 1.")
-  }
-  
-  # Initialize the result matrix
-  res <- matrix(0, nrow = 2 * n, ncol = p)
-  pairs_c <- t(combn(1:p, 2))
-  num_pairs <- nrow(pairs_c)
-  
-  # Calculate the number of pairs to assign based on proportions
-  row_counts <- round(n * prop)
-  print(row_counts)
-  
-  # Ensure the sum of row_counts is exactly n
-  while (sum(row_counts) < n) {
-    diff_idx <- which.max(prop - row_counts / n)
-    row_counts[diff_idx] <- row_counts[diff_idx] + 1
-  }
-  while (sum(row_counts) > n) {
-    diff_idx <- which.min(prop - row_counts / n)
-    row_counts[diff_idx] <- row_counts[diff_idx] - 1
-  }
-  print((row_counts))
-  
-  current_row <- 1
-  for (col_index in 1:p) {
-    col_pairs <- pairs_c[apply(pairs_c, 1, function(row) col_index %in% row), ]
-    if (is.vector(col_pairs)) col_pairs <- matrix(col_pairs, ncol = 2)
-    
-    for (i in 1:row_counts[col_index]) {
-      pair_idx <- (i %% nrow(col_pairs)) + 1
-      res[current_row, col_pairs[pair_idx, 1]] <- 1
-      res[current_row + 1, col_pairs[pair_idx, 2]] <- 1
-      current_row <- current_row + 2
-    }
-  }
-  return(res)
-}
-
-a = gen_X(nc, pc, 11)
-apply(a, 1, sum)
-apply(a, 2, sum)
-t2 <- 0
-for (i in 1:nc){ifelse(all(a[2*i - 1, ] == a[2*i,]), t2 <- t2 + 1, t2 <- t2 + 0)}
-print(t2)
-
-
-
+write.csv(final_df, "results/elastic_results_nc_fc_temp.csv")
 
 
