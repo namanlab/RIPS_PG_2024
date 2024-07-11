@@ -21,8 +21,8 @@ library(HDInterval)
 library(mvtnorm)
 
 # Sample data to use in the visualizations
-data_elastic_tau_1 <- read.csv("results_fc/elastic_results_tau1.csv") 
-data_normalized_tau_1 <- read.csv("results_fc/elastic_results_tau1.csv")
+data_elastic_tau_1 <- read.csv("results_fc/elastic_results_tau1_updated.csv") 
+data_elastic_tau_2 <- read.csv("results_fc/elastic_results_tau2_updated.csv")
 data_elastic_fc <- read.csv("results_fc/elastic_results_nc_fc_final.csv")
 
 data_elastic_power <- read.csv("results_oc/elastic_power_results_nc.csv")

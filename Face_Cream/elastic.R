@@ -265,14 +265,14 @@ Xc <- gen_X(nc, pc, round(2*nc/pc))
 sig = 0.2
 uh = 2.6
 nh = 50
-res = run_simulation(sig, 0.1, uh, nh, uc, Xc, Zc, 5000, 1, 0.95)
-res$distr_df %>%
-  ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
-  facet_wrap(~p) +
-  theme_bw() +
-  labs(fill = "Type")
-
-## Tau Analysis:
+# res = run_simulation(sig, 0.1, uh, nh, uc, Xc, Zc, 5000, 1, 0.95)
+# res$distr_df %>%
+#   ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
+#   facet_wrap(~p) +
+#   theme_bw() +
+#   labs(fill = "Type")
+# 
+# # Tau Analysis:
 # final_df_1 <- NULL
 # final_df_2 <- NULL
 # 
@@ -286,66 +286,64 @@ res$distr_df %>%
 #   final_df_2 <- rbind(final_df_2, temp_df_2)
 # }
 # 
-# write.csv(final_df_1, "results/elastic_results_tau1.csv")
-# write.csv(final_df_2, "results/elastic_results_tau2.csv")
+# write.csv(final_df_1, "results/elastic_results_tau1_updated.csv")
+# write.csv(final_df_2, "results/elastic_results_tau2_updated.csv")
+
+
+
+
+# library(foreach)
+# library(doParallel)
+# library(doSNOW)
+# 
+# numCores <- detectCores() - 2
+# cl <- makeCluster(numCores)
+# registerDoParallel(cl)
+# 
+# final_df <- NULL
+# delta1 <- seq(0, 0.2, 0.02)
+# delta2 <- seq(0, 0.2, 0.02)
+# nc_seq <- seq(5, 35, 5)
+# checkpoint_interval <- 150  # Set your checkpoint interval here
+# checkpoint_counter <- 0
+# 
+# final_df <- foreach(nc_val = nc_seq, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %:%
+#   foreach(i = delta1, .combine = rbind) %dopar% {
+#     cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
+#     temp_results <- foreach(j = delta2, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %dopar% {
+#       set.seed(42)
+#       temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.05), 0)
+#       temp_uh <-  2.6 + j
+#       temp_Xc <- gen_X(nc, pc, nc_val)
+#       res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
+#       temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power, ess = res1$EHSS)
+#       
+#       # Return temp_df for combining
+#       temp_df
+#     }
+#     
+#     # Save checkpoint within the outer loop
+#     checkpoint_counter <<- checkpoint_counter + nrow(temp_results)
+#     if (checkpoint_counter >= checkpoint_interval) {
+#       write.csv(temp_results, file = paste0("results/elastic_checkpoint_nc_", Sys.time(), ".csv"), row.names = FALSE)
+#       checkpoint_counter <<- 0  # Reset the checkpoint counter
+#     }
+#     
+#     temp_results  # Return the results for this iteration
+#   }
+# 
+# write.csv(final_df, "results/elastic_results_nc_fc.csv", row.names = FALSE)
 # 
 # 
+# stopCluster(cl)
 
 
 
-library(foreach)
-library(doParallel)
-library(doSNOW)
-
-numCores <- detectCores() - 2
-cl <- makeCluster(numCores)
-registerDoParallel(cl)
 
 final_df <- NULL
 delta1 <- seq(0, 0.2, 0.02)
 delta2 <- seq(0, 0.2, 0.02)
 nc_seq <- seq(5, 35, 5)
-checkpoint_interval <- 150  # Set your checkpoint interval here
-checkpoint_counter <- 0
-
-final_df <- foreach(nc_val = nc_seq, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %:%
-  foreach(i = delta1, .combine = rbind) %dopar% {
-    cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
-    temp_results <- foreach(j = delta2, .combine = rbind, .packages = c("MCMCpack", "LaplacesDemon", "invgamma", "tidyverse", "HDInterval", "mvtnorm")) %dopar% {
-      set.seed(42)
-      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.05), 0)
-      temp_uh <-  2.6 + j
-      temp_Xc <- gen_X(nc, pc, nc_val)
-      res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
-      temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power, ess = res1$EHSS)
-      
-      # Return temp_df for combining
-      temp_df
-    }
-    
-    # Save checkpoint within the outer loop
-    checkpoint_counter <<- checkpoint_counter + nrow(temp_results)
-    if (checkpoint_counter >= checkpoint_interval) {
-      write.csv(temp_results, file = paste0("results/elastic_checkpoint_nc_", Sys.time(), ".csv"), row.names = FALSE)
-      checkpoint_counter <<- 0  # Reset the checkpoint counter
-    }
-    
-    temp_results  # Return the results for this iteration
-  }
-
-write.csv(final_df, "results/elastic_results_nc_fc.csv", row.names = FALSE)
-
-
-stopCluster(cl)
-
-
-
-
-final_final_df <- final_df
-final_df <- NULL
-delta1 <- seq(0, 0.2, 0.04)
-delta2 <- seq(0, 0.2, 0.04)
-nc_seq <- c(30)
 for (nc_val in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
@@ -358,6 +356,11 @@ for (nc_val in nc_seq){
       temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power,
                             ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
+      
+      # Checkpointing
+      if (nrow(final_df) %% 110 == 0) {
+        write.csv(final_df, file = paste0("results/elastic_checkpoint_fc_nc_", nrow(final_df), ".csv"))
+      }
     }
   }
 }
