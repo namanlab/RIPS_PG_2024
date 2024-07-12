@@ -1,0 +1,29 @@
+# R Packages with Versions
+
+# Shiny and Dashboard
+shiny
+shinydashboard
+
+# LaTeX Expression Rendering
+latex2exp
+
+# Data Manipulation and Visualization
+tidyverse
+plotly
+reshape2
+
+# Statistical Analysis and Machine Learning
+e1071
+MCMCpack
+LaplacesDemon
+invgamma
+mvtnorm
+
+# Bootstrap Themes
+bslib
+
+# Excel Data Import
+readxl
+
+# Interval Computation
+HDInterval
