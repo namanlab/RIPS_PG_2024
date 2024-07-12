@@ -343,7 +343,8 @@ nh = 50
 final_df <- NULL
 delta1 <- seq(0, 0.2, 0.02)
 delta2 <- seq(0, 0.2, 0.02)
-nc_seq <- seq(5, 35, 5)
+nc_seq <- seq(18, 66, 12)
+nc_seq <- seq(66, 78, 12)
 for (nc_val in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
@@ -356,6 +357,12 @@ for (nc_val in nc_seq){
       temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power,
                             ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
+      
+      print(res1$distr_df %>%
+          ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
+          facet_wrap(~p) +
+          theme_bw() +
+          labs(fill = "Type"))
       
       # Checkpointing
       if (nrow(final_df) %% 110 == 0) {
