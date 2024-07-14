@@ -340,20 +340,25 @@ nh = 50
 
 
 
+nc <- 99
+pc <- 3
+Zc <- gen_Z(nc)
+sig = 0.2
+tau = 0.1
+nh = 50
 final_df <- NULL
 delta1 <- seq(0, 0.2, 0.02)
 delta2 <- seq(0, 0.2, 0.02)
-nc_seq <- seq(18, 66, 12)
-nc_seq <- seq(66, 78, 12)
+nc_seq <- seq(66, 18, -12)
 for (nc_val in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
     for (j in delta2){
       set.seed(42)
-      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.05), 0)
+      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.02), 0)
       temp_uh <-  2.6 + j
       temp_Xc <- gen_X(nc, pc, nc_val)
-      res1 <- run_simulation(sig, 0.1, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
+      res1 <- run_simulation(sig, tau, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)
       temp_df <- data.frame(nc = nc_val, delta1 = i, delta2 = j, pow = res1$power,
                             ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
@@ -371,7 +376,7 @@ for (nc_val in nc_seq){
     }
   }
 }
-
+# 
 write.csv(final_df, "results/elastic_results_nc_fc_temp.csv")
 
 
