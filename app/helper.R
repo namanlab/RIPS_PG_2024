@@ -173,7 +173,7 @@ read_data_FC <- function(file1, file2) {
   }
   
   data_hist <- read_excel(file2)
-  xh <- as.vector(as.matrix(data[, 3:ncol(data_hist)]))
+  xh <- as.vector(as.matrix(data[, 1:ncol(data_hist)]))
   
   list(Xc = Xc, Zc = Zc, xc = xc, xh = xh)
 }
