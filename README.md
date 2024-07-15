@@ -50,10 +50,6 @@ Furthermore, we demonstrate the application of these methodologies through sampl
 │   │   ├── elastic_results_nc.csv
 │   │   ├── normalized_results_nc.csv
 │   │   └── rMAP_results_nc.csv
-│   ├── rsconnect
-│   │   └── shinyapps.io
-│   │       └── 3vxc23-naman-agrawal
-│   │           └── RIPS_app.dcf
 │   └── sample_generated_data.xlsx
 ├── old
 └── requirements.txt
