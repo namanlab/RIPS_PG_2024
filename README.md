@@ -12,6 +12,54 @@ Furthermore, we demonstrate the application of these methodologies through sampl
 
 ## Repository Structure
 
+```plaintext
+.
+├── Face_Cream
+│   ├── commensurate.R
+│   ├── elastic.R
+│   ├── normalized.R
+│   ├── power.R
+│   └── results
+│       └── elastic_results_nc_fc_temp.csv
+├── Oral_Care
+│   ├── Plot_Result.R
+│   ├── commensurate.R
+│   ├── elastic.R
+│   ├── elastic_power.R
+│   ├── normalized.R
+│   ├── results
+│   │   ├── commensurate_results_nc.csv
+│   │   ├── elastic_power_results_nc.csv
+│   │   ├── elastic_results_nc.csv
+│   │   ├── normalized_results_nc.csv
+│   │   └── rMAP_results_nc.csv
+│   └── robust_map.R
+├── README.md
+├── app
+│   ├── app.R
+│   ├── helper.R
+│   ├── helper_fc.R
+│   ├── helper_oc.R
+│   ├── results_fc
+│   │   ├── elastic_results_nc_fc.csv
+│   │   ├── elastic_results_tau1_updated.csv
+│   │   └── elastic_results_tau2_updated.csv
+│   ├── results_oc
+│   │   ├── commensurate_results_nc.csv
+│   │   ├── elastic_power_results_nc.csv
+│   │   ├── elastic_results_nc.csv
+│   │   ├── normalized_results_nc.csv
+│   │   └── rMAP_results_nc.csv
+│   ├── rsconnect
+│   │   └── shinyapps.io
+│   │       └── 3vxc23-naman-agrawal
+│   │           └── RIPS_app.dcf
+│   └── sample_generated_data.xlsx
+├── old
+└── requirements.txt
+```
+
+
 - `Face_Cream` Directory
     - `commensurate.R`: Script implementing commensurate prior methodology for the face cream dataset.
     - `elastic.R`: Script implementing elastic prior methodology for the face cream dataset.
@@ -93,5 +141,5 @@ To run the Shiny app, follow these steps:
 This repository contains a comprehensive set of scripts and data for analyzing Bayesian Dynamic Borrowing methodologies applied to oral care and face cream datasets. By following the provided documentation, you can replicate the analyses and explore the results through the Shiny app.
 
 
-This markdown file provides a clear and detailed documentation for the repository, including the project description, file descriptions, instructions for running the Shiny app, and other relevant details. Let us know if you need any modifications or additional information!
+This markdown file provides a documentation for the repository, including the project description, file descriptions, instructions for running the Shiny app, and other relevant details. Let us know if you need any modifications or additional information!
 
