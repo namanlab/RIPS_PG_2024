@@ -57,6 +57,7 @@ Furthermore, we demonstrate the application of these methodologies through sampl
 │   └── sample_generated_data.xlsx
 ├── old
 └── requirements.txt
+└── images
 ```
 
 
@@ -111,6 +112,9 @@ Furthermore, we demonstrate the application of these methodologies through sampl
 
 - `README.md`
     - This file. Provides documentation for the repository.
+
+- `images`
+    - Contains `dashboard.png` for the README file
 
 ## Algorithm
 
