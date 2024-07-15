@@ -89,8 +89,8 @@ Furthermore, we demonstrate the application of these methodologies through sampl
     - `helper_oc.R`: Helper functions specific to the oral care dataset for the Shiny app.
     - `results_fc` Directory
         - `elastic_results_nc_fc.csv`: Contains elastic prior results for the face cream dataset used in the Shiny app.
-        - `elastic_results_tau1_updated.csv`: Contains updated elastic prior results for the face cream dataset with tau1 parameter.
-        - `elastic_results_tau2_updated.csv`: Contains updated elastic prior results for the face cream dataset with tau2 parameter.
+        - `elastic_results_tau1_updated.csv`: Contains updated elastic prior results for the face cream dataset for the density plots.
+        - `elastic_results_tau2_updated.csv`: Contains updated elastic prior results for the face cream dataset to understand how metrics (MSE, PESS, Power) vary with tau.
     - `results_oc` Directory
         - `commensurate_results_nc.csv`: Contains commensurate prior results for the oral care dataset used in the Shiny app.
         - `elastic_power_results_nc.csv`: Contains elastic power prior results for the oral care dataset used in the Shiny app.
