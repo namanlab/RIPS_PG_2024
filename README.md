@@ -164,7 +164,7 @@ This project uses `renv`, a package management tool for R, to ensure consistent 
 
 ## Algorithm: Simulation and Posterior Inference for Oral Care Dataset
 
-1. **RunSimulation**($n_t, n_c, n_h, \sigma_t, \sigma_c, \sigma_h, \theta_t, \theta_c, \theta_h$, N, R, \text{cutoff})  
+1. **RunSimulation**($n_t, n_c, n_h, \sigma_t, \sigma_c, \sigma_h, \theta_t, \theta_c, \theta_h$, N, R, $\text{cutoff}$)  
     - Generate $n_h$ sets of historical data, and merge them into a single vector  
     - Initialise variables  
     - For $trial$ from 1 to $R$ do:  
