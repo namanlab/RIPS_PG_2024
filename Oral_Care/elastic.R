@@ -1,10 +1,26 @@
-
 library(LaplacesDemon)
 library(invgamma)
 library(tidyverse)
 library(HDInterval)
 library(RBesT)
 
+# Function to run the simulation
+# Inputs:
+# nt - sample size for treatment group
+# nc - sample size for control group
+# nh - vector of sample sizes for historical data
+# sigc - standard deviation for control group
+# sigt - standard deviation for treatment group
+# sigh - vector of standard deviations for historical data
+# uc - true mean for control group
+# ut - true mean for treatment group
+# uh - vector of means for historical data
+# H - hyperparameter for method (default = 1)
+# N - number of MCMC samples
+# R - number of simulation repetitions
+# cutoff - threshold for rejecting null hypothesis
+# Outputs:
+# A list containing various metrics and plots
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
   set.seed(42)
@@ -119,7 +135,9 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
 }
 
 
-# can return a list of all params if needed to be used by model, return null if not needed
+# Function to get parameters for models (needs to be defined based on the method used)
+# Inputs and Outputs need to be defined based on specific use case
+
 get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R){
   params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 5000)
   return(params)
@@ -185,7 +203,7 @@ decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
 }
 
 
-#-----Function to sample posterior of mean value for control arm------------#
+#-----Function to sample posterior of mean value for control arm (vectorized)------------#
 # Inputs:
 # x0: historical data
 # n0: sample size for historical data
@@ -197,28 +215,6 @@ decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
 # 
 # Outputs:
 # muc_post: posterior of mean value for control arm
-sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000){
-  muc_post <- numeric(sim-nburn)
-  muc_ini <- mean(xc)
-  muc <- muc_ini
-  for (s in 1:sim) {
-    # sample control variance from posterior
-    alpha <- (1 + nc)/2
-    beta <- nc*(var(xc) + (mean(xc) - muc)^2)/2
-    sig <- rinvgamma(1, alpha, beta)
-    # sample mean from posterior
-    D <- var(x0)/(n0*gt)
-    mu <- (nc*mean(xc)*D + sig*mean(x0))/(nc*D + sig)
-    var <- sig*D/(D*nc + sig)
-    muc <- rnorm(1, mu, sqrt(var)) 
-    if(s > nburn){
-      muc_post[s-nburn] <- muc
-    }
-  }
-  return(list(muc_post=muc_post))
-}
-
-# vectorized:
 sample_poster <- function(x0, n0, xc, nc, gt, sim=20000, nburn=10000) {
   mean_x0 <- mean(x0)
   var_x0 <- var(x0)

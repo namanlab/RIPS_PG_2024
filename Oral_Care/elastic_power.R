@@ -4,6 +4,23 @@ library(invgamma)
 library(tidyverse)
 library(HDInterval)
 
+# Function to run the simulation
+# Inputs:
+# nt - sample size for treatment group
+# nc - sample size for control group
+# nh - vector of sample sizes for historical data
+# sigc - standard deviation for control group
+# sigt - standard deviation for treatment group
+# sigh - vector of standard deviations for historical data
+# uc - true mean for control group
+# ut - true mean for treatment group
+# uh - vector of means for historical data
+# H - hyperparameter for method (default = 1)
+# N - number of MCMC samples
+# R - number of simulation repetitions
+# cutoff - threshold for rejecting null hypothesis
+# Outputs:
+# A list containing various metrics and plots
 run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R, cutoff){
   
   set.seed(42)
@@ -117,11 +134,23 @@ run_simulation <- function(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N, R
   
 }
 
-
+# Function to get parameters for models (needs to be defined based on the method used)
+# Inputs and Outputs need to be defined based on specific use case
 get_params <- function(xh, nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H, N, R) {
   list()
 }
 
+# Function to get posterior for control arm
+# Inputs:
+# params - model parameters (not used in this function but kept for compatibility)
+# xc - control data
+# xh - combined historical data
+# nc - sample size for control group
+# nh - sample size for historical data
+# H - hyperparameter for method
+# N - number of MCMC samples
+# Outputs:
+# A list containing posterior samples for the control mean (prost_samples), effective sample size (ess), and mean of the sigma samples (mss)
 get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   
   a0 <- get_GT(xc, xh, nc, nh, H, N)
