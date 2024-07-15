@@ -19,6 +19,8 @@ library(invgamma)
 library(tidyverse)
 library(HDInterval)
 library(mvtnorm)
+library(viridis)
+library(R.utils)
 
 # Sample data to use in the visualizations
 data_elastic_tau_1 <- read.csv("results_fc/elastic_results_tau1_updated.csv") 

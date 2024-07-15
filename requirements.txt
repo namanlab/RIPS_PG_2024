@@ -11,6 +11,7 @@ latex2exp
 tidyverse
 plotly
 reshape2
+viridis
 
 # Statistical Analysis and Machine Learning
 e1071
@@ -21,6 +22,7 @@ mvtnorm
 
 # Bootstrap Themes
 bslib
+R.utils
 
 # Excel Data Import
 readxl
