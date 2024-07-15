@@ -119,6 +119,50 @@ Furthermore, we demonstrate the application of these methodologies through sampl
     
 - `renv.lock`
     - Captures precise versions of R packages installed in a project, ensuring reproducibility of the environment."
+    
+## Using `renv` for Package Management
+
+This project uses `renv`, a package management tool for R, to ensure consistent package versions across different environments. Follow these steps to set up and manage the project environment using `renv`:
+
+### Setup Instructions
+
+1. **Install `renv`**:
+   - If `renv` is not already installed, install it from CRAN using:
+     ```
+     install.packages("renv")
+     ```
+
+2. **Activate `renv`**:
+   - Activate the `renv` environment for this project. In your R console or script, run:
+     ```
+     renv::activate()
+     ```
+
+3. **Restore Packages**:
+   - Use the `renv.lock` file to restore the project's package dependencies. This ensures that you have the exact same package versions as recorded in `renv.lock`:
+     ```
+     renv::restore()
+     ```
+
+### Updating Packages
+
+- If you need to update packages for your project, follow these steps:
+
+  1. **Update Packages**:
+     - Update packages as needed using standard R package management functions (e.g., `install.packages()` or `remotes::install_github()`).
+
+  2. **Update `renv.lock`**:
+     - After updating packages, update the `renv.lock` file to reflect the changes. Run:
+       ```
+       renv::snapshot()
+       ```
+     - This command updates `renv.lock` with the current package versions in your environment.
+
+### Version Control
+
+- **Commit `renv.lock`**:
+  - It's important to commit the `renv.lock` file to your version control system (e.g., Git) to ensure reproducibility across collaborators and environments.
+  
 
 ## Algorithm
 
@@ -190,50 +234,6 @@ To run the Shiny app, follow these steps:
 4. Access the App: Open a web browser and navigate to the provided local URL (typically http://127.0.0.1:XXXX) to access the Shiny app interface.
 
 ![Dashboard Example](images/dashboard.png)
-
-
-## Using `renv` for Package Management
-
-This project uses `renv`, a package management tool for R, to ensure consistent package versions across different environments. Follow these steps to set up and manage the project environment using `renv`:
-
-### Setup Instructions
-
-1. **Install `renv`**:
-   - If `renv` is not already installed, install it from CRAN using:
-     ```
-     install.packages("renv")
-     ```
-
-2. **Activate `renv`**:
-   - Activate the `renv` environment for this project. In your R console or script, run:
-     ```
-     renv::activate()
-     ```
-
-3. **Restore Packages**:
-   - Use the `renv.lock` file to restore the project's package dependencies. This ensures that you have the exact same package versions as recorded in `renv.lock`:
-     ```
-     renv::restore()
-     ```
-
-### Updating Packages
-
-- If you need to update packages for your project, follow these steps:
-
-  1. **Update Packages**:
-     - Update packages as needed using standard R package management functions (e.g., `install.packages()` or `remotes::install_github()`).
-
-  2. **Update `renv.lock`**:
-     - After updating packages, update the `renv.lock` file to reflect the changes. Run:
-       ```
-       renv::snapshot()
-       ```
-     - This command updates `renv.lock` with the current package versions in your environment.
-
-### Version Control
-
-- **Commit `renv.lock`**:
-  - It's important to commit the `renv.lock` file to your version control system (e.g., Git) to ensure reproducibility across collaborators and environments.
 
 
 
