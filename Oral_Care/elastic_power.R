@@ -159,7 +159,7 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
   logit <- function(p) log(p / (1 - p))
   inv_logit <- function(x) exp(x) / (1 + exp(x))
   
-  # Define the posterior distribution for control arm using commensurate power prior
+  # Define the posterior distribution for control arm
   log_posterior <- function(theta) {
     mu <- theta[1]
     sigma2 <- exp(theta[2])
@@ -170,8 +170,6 @@ get_control_prost <- function(params, xc, xh, nc, nh, H, N) {
     
     # Prior distributions
     log_prior_sigma <- -sigma2
-    
-    # Commensurate prior for θ
     jacob_log <- log(sigma2)
     
     # Posterior
@@ -242,14 +240,13 @@ decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
 #################################### MODEL #####################################
 #########--------------------------------------------------------------#########
 
-
 ## settings
 nt <- 29 # current treatment size
 nh <- c(20, 25, 29, 24) # historical control size
 sigc <- 0.153 # control sd
 sigt <- 0.17 # treatment sd
 sigh <- c(0.09, 0.09, 0.33, 0.22) # historical sd
-uc <- 1.26 + 1.33 # true mean of control
+ut <- 1.26 + 1.33 # true mean of control
 
 final_df <- NULL
 delta1 <- seq(0, 0.2, 0.02)
@@ -259,10 +256,9 @@ for (nc in nc_seq){
   for (i in delta1){
     cat("\n==========\nProcessing nc:", nc, " delta1:", i, "\n==========\n")
     for (j in delta2){
-      print(j)
-      ut <- uc + i
+      uc <- ut + i
       set.seed(42)
-      uh <-  rep(uc, 4) + rnorm(4, j, 0.05)
+      uh <-  rep(ut, 4) + rnorm(4, j, 0.05)
       res1 <- run_simulation(nt, nc, nh, sigc, sigt, sigh, uc, ut, uh, H = 1, N = 10000, R = 100, cutoff = 0.95) 
       temp_df <- data.frame(nc = nc, delta1 = i, delta2 = j, pow2 = res1$pow, pow1 = res1$prob_rej, ess = res1$EHSS)
       final_df <- rbind(final_df, temp_df)
@@ -275,4 +271,6 @@ for (nc in nc_seq){
   }
 }
 
+
 write.csv(final_df, "results/elastic_power_results_nc.csv")
+

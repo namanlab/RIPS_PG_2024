@@ -285,7 +285,7 @@ for (nc_val in nc_seq){
     cat("\n==========\nProcessing nc:", nc_val, " delta1:", i, "\n==========\n")
     for (j in delta2){
       set.seed(42)
-      temp_uc <- rep(2.6, pc) + c(rnorm(pc - 1, i, 0.02), 0)
+      temp_uc <- c(rep(2.6, pc - 1), 2.6 + rnorm(1, i, 0.02))
       temp_uh <-  2.6 + j
       temp_Xc <- gen_X(nc, pc, nc_val)
       res1 <- run_simulation(sig, tau, temp_uh, nh, temp_uc, temp_Xc, Zc, 5000, 10, 0.95)

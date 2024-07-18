@@ -124,8 +124,8 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
   # pc: Number of columns in design matrix Xc
   
   xcc <- xc[which(Xc[,pc] == 1)]
-  ncc <- length(xcc)
-  gt <- getGT(xcc, xh, ncc, nh, N, pc)
+  prob_w <- pnorm(mean(xcc), mean = mean(xh), sd = sd(xh)/sqrt(nh))
+  w = 2*min(prob_w, 1 - prob_w)
   
   # Logit and inverse logit functions
   logit <- function(p) log(p / (1 - p))
@@ -139,7 +139,6 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
     }
   }
   
-  
   # Define the posterior distribution for control arm using commensurate power prior
   log_posterior <- function(theta) {
     mu <- theta[1:pc]
@@ -148,16 +147,17 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
     
     # Likelihood
     log_lik_current <- dmvnorm(t(xc), mean = Xc %*% mu, sigma = tau2*(Zc %*% t(Zc)) + sigma2*diag(2*nc), log = T)
-    log_lik_hist <- dnorm(mu[pc], mean(xh), sqrt((sigma2 + tau2)/(nh*gt)), log = T)
+    log_lik_hist <- dnorm(mean(xh), mu[pc],sqrt(sigma2 + tau2))
+    log_lik_theta_hist <- log(w*log_lik_hist + (1 - w))
     
     # Prior distributions
     log_prior_sigma <- log_inverse_gamma(sigma2)
     log_prior_tau <- log_inverse_gamma(tau2)
     
-    jacob_log <- log(sigma2) + log(tau2) 
-    
+    jacob_log <- log(sigma2) + log(tau2)
+
     # Posterior
-    log_post <- log_lik_current + log_lik_hist + log_prior_sigma + log_prior_tau + jacob_log 
+    log_post <- log_lik_current + log_lik_theta_hist + log_prior_sigma + log_prior_tau + jacob_log
     
     if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
       return(-Inf)  # Return -Inf for invalid log-posterior values
@@ -165,55 +165,20 @@ get_control_prost <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
     return(log_post)
   }
   
-  init_mu <- rep(0, pc)
-  for (i in 1:pc){init_mu[i] <- mean(xc[which(Xc[,i] == 1)])}
-  init_values <- c(init_mu, log(1), log(1))  # Initial values for MCMC sampling
+  init_values <- c(rep(0, pc), log(1), log(1))  # Initial values for MCMC sampling
   # Perform MCMC sampling for posterior
   samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
-                           mcmc = N, burnin = 1000, thin = 1, force.samp = T,
-                           optim.method = "Nelder-Mead")
+                          mcmc = N, burnin = 1000, thin = 1, force.samp = T,
+                          optim.method = "Nelder-Mead")
   
   # Extract posterior samples for mu, sigma, a0, theta0, and tau
   mu_samples <- samples[, 1:pc]
   sigma2_samples <- exp(samples[, pc + 1])
   tau2_samples <- inv_logit(samples[, pc + 2])
-  list(prost_samples = mu_samples, ess = gt*nh)
-}
-
-
-decide_para <- function(c, x0, n0, nc, gamma, q1, q2, small, large, R){
-  set.seed(1)
-  u0 <- mean(x0)
-  sig0 <- sd(x0)
-  mc <- c(u0, u0 + gamma,  u0 - gamma)
-  t <- matrix(NA, R, length(mc))
-  for (i in 1:R) {
-    for (j in 1:length(mc)) {
-      xc <- rnorm(nc, mc[j], sig0)
-      sp <- ((n0-1)*sig0^2 + (nc-1)*var(xc))/(n0 + nc - 2) # pooled variance
-      t[i,j] <- max(n0, nc)^(-1/4)*abs(u0-mean(xc))/(sqrt(sp/n0 + sp/nc))
-    }
-  }
-  quant1 <- quantile(t[,1], q1)
-  quant2 <- quantile(t[,2], q2)
-  quant3 <- quantile(t[,3], q2)
-  KS_homo <- quant1
-  KS_hete <- min(quant2, quant3)
-  b <- log((1-large)*small/((1-small)*large))/((log(KS_homo))^c-(log(KS_hete))^c)
-  a <- log((1-large)/large)-b*(log(KS_homo))^c
-  return(list(a=a, b=b, c=c))
-}
-
-getGT <- function(xc, xh, nc, nh, N, pc){
-  params <- decide_para(c=1, xh, nh, nc, gamma=1, q1=0.95, q2=0.02, small = 0.01, large = 0.99, R = 5000)
-  a <- params$a 
-  b <- params$b 
-  c <- params$c
-  # calculate statistic and g(t)
-  sp <- ((nh-1)*var(xh) + (nc-1)*var(xc))/(nh + nc - 2) # pooled variance
-  cong_measure <- max(nh, nc)^(-1/4)*abs(mean(xh)-mean(xc))/(sqrt(sp/nh + sp/nc))
-  gt <- 1/(1 + exp(a + b*(log(cong_measure))^c))
-  return(gt)
+  # Calculate effective sample size (ESS)
+  ess <- mean(sigma2_samples)/var(mu_samples[,pc])
+  
+  list(prost_samples = mu_samples, ess = ess)
 }
 
 
@@ -303,8 +268,8 @@ for (i in seq(0, 0.4, 0.02)){
   final_df_2 <- rbind(final_df_2, temp_df_2)
 }
 
-write.csv(final_df_1, "results/elastic_results_tau1_updated.csv")
-write.csv(final_df_2, "results/elastic_results_tau2_updated.csv")
+write.csv(final_df_1, "results/rMAP_results_tau1_updated.csv")
+write.csv(final_df_2, "results/rMAP_results_tau2_updated.csv")
 
 
 
@@ -332,19 +297,19 @@ for (nc_val in nc_seq){
       final_df <- rbind(final_df, temp_df)
       
       print(res1$distr_df %>%
-          ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
-          facet_wrap(~p) +
-          theme_bw() +
-          labs(fill = "Type"))
+              ggplot(aes(x = val, fill = type)) + geom_density(alpha = 0.5) +
+              facet_wrap(~p) +
+              theme_bw() +
+              labs(fill = "Type"))
       
       # Checkpointing
       if (nrow(final_df) %% 110 == 0) {
-        write.csv(final_df, file = paste0("results/elastic_checkpoint_fc_nc_", nrow(final_df), ".csv"))
+        write.csv(final_df, file = paste0("results/rMAP_checkpoint_fc_nc_", nrow(final_df), ".csv"))
       }
     }
   }
 }
 # 
-write.csv(final_df, "results/elastic_results_nc_fc_temp.csv")
+write.csv(final_df, "results/rMAP_results_nc_fc_temp.csv")
 
 
