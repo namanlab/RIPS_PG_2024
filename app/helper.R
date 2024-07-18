@@ -192,6 +192,50 @@ read_data_FC <- function(file1, file2) {
   list(Xc = Xc, Zc = Zc, xc = xc, xh = xh)
 }
 
+
+read_data_FC_ss <- function(file1) {
+  
+  # Helper function to read the file based on extension
+  read_file <- function(file) {
+    ext <- tools::file_ext(file)
+    if (ext == "csv") {
+      return(read_csv(file))
+    } else if (ext == "xlsx" || ext == "xls") {
+      return(read_excel(file))
+    } else {
+      stop("Unsupported file type")
+    }
+  }
+  
+  # Read both files
+  data <- read_file(file1)
+  
+  data[[1]] = as.numeric(as.factor(data[[1]]))
+  data[[2]] = as.numeric(as.factor(data[[2]]))
+  data[[3]] = as.numeric(as.factor(data[[3]]))
+  colnames(data) <- c("ids", "sides", "treat_grp", "y")
+  ids <- data[[1]]
+  sides <- data[[2]]
+  treat_grp <- data[[3]]
+  nc = length(unique(ids))
+  pc = length(unique(treat_grp))
+  Zc = gen_Z(nc)
+  Xc <- matrix(0, nrow = 2 * nc, ncol = pc)
+  xc <- rep(0, 2*nc)
+  for (i in 1:nc) {
+    temp_df <- data %>% filter(ids == i) %>% arrange(sides)
+    cur_t <- temp_df %>% pull(treat_grp)
+    cur_y <- temp_df %>% pull(y)
+    Xc[2 * i - 1, cur_t[1]] <- 1
+    Xc[2 * i, cur_t[2]] <- 1
+    xc[2*i - 1] <- cur_y[1]
+    xc[2*i] <- cur_y[2]
+  }
+  
+  list(Xc = Xc, Zc = Zc, xc = xc)
+}
+
+
 # Helper function to compute all Bayesian probabilities
 compute_bayesian_probs_FC <- function(Xc, Zc, xc, xh, N) {
   list(

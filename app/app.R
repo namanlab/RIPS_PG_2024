@@ -187,6 +187,33 @@ server <- function(input, output, session) {
     
   })
   
+  observeEvent(input$submit_sim_FC, {
+    req(input$datafile)
+    
+    data <- read_data_FC_ss(input$datafile$datapath)
+    Zc <- data$Zc
+    Xc <- data$Xc
+    xc <- data$xc
+    
+    H <- input$H
+    yh_list <- lapply(1:H, function(i) {
+      muh <- input[[paste0("muh_", i)]]
+      sigma2_h <- input[[paste0("sigma2_h_", i)]]
+      nh <- input[[paste0("nh_", i)]]
+      rnorm(nh, muh, sqrt(sigma2_h))
+    })
+    xh <- unlist(yh_list)
+    
+    # Compute results for each method
+    bayesian_probs <- compute_bayesian_probs_FC(Xc, Zc, xc, xh, input$R_samples)
+    bayesian_probs2 <- compute_bayesian_probs_FC_nohist(Xc, Zc, xc, xh, input$R_samples)
+    
+    output$results_elastic_FC <- renderUI({
+      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic, bayesian_probs2$elastic)
+    })
+    
+  })
+  
   observeEvent(input$simulate_FC, {
     
     nc <- input$n
@@ -235,7 +262,7 @@ server <- function(input, output, session) {
   output$dynamic_sidebar <- renderUI({
     if (input$dataset == "Face Cream") {
       sidebarMenu(
-        selectInput("anal_type", "Use:", choices = c("Power Analysis", "Tau Analysis", "Import Data", "Run Simulation")),
+        selectInput("anal_type", "Use:", choices = c("Power Analysis", "Tau Analysis", "Import All Data", "Run Simulation",  "Import Current Data")),
         uiOutput("dynamic_sidebar_sub_fc")
       )
     } else {
@@ -326,7 +353,7 @@ server <- function(input, output, session) {
         selectInput("feature", "Select Feature:", choices = unique(data_elastic_tau_2$p)),
         selectInput("var", "Select Variable:", choices = c("Power", "PESS", "MSE"))
       )
-    } else if (input$anal_type == "Import Data") {
+    } else if (input$anal_type == "Import All Data") {
       sidebarMenu(
         numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
         tags$div(title=paste0("Data Import Format\n\n",
@@ -343,6 +370,21 @@ server <- function(input, output, session) {
                  fileInput("datafile_hist", "Upload Excel File (Historical Data)", accept = c(".xlsx", ".csv"))
         ),
         actionButton("submit_FC", "Submit")
+      )
+    } else if (input$anal_type == "Import Current Data") {
+      sidebarMenu(
+        numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
+        tags$div(title=paste0("Data Import Format\n\n",
+                              "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
+                              "1. First Column (id): This column should contain the face id (unique identifier for the face/indivdual the sample comes from)\n\n",
+                              "2. Second Column (side): This column should contain either L (left) or R (right) denoting the side of the face from which the sample came.\n\n",
+                              "3. Third Column (treatment_grp): This column should contain the treatment id/name (unique identifier for the treatment/control applied on the sample)\n\n",
+                              "4. Fourth Column (y): This column should contain the measured value/observation (after adjusting for the baseline).\n\n"),
+                 fileInput("datafile", "Upload Excel File (Current Data)", accept = c(".xlsx", ".csv"))
+        ),
+        numericInput("H", "Number of historical datasets", value = 1, min = 1),
+        uiOutput("historical_data_inputs"),
+        actionButton("submit_sim_FC", "Submit")
       )
     } else {
       sidebarMenu(
