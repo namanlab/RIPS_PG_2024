@@ -51,6 +51,8 @@ Furthermore, we demonstrate the application of these methodologies through sampl
 │   │   ├── normalized_results_nc.csv
 │   │   └── rMAP_results_nc.csv
 │   └── sample_generated_data.xlsx
+│   └── sample_data_fc_current.csv
+│   └── sample_data_fc_hist.csv
 ├── old
 └── requirements.txt
 └── images
@@ -96,7 +98,8 @@ Furthermore, we demonstrate the application of these methodologies through sampl
         - `normalized_results_nc.csv`: Contains normalized prior results for the oral care dataset used in the Shiny app.
         - `rMAP_results_nc.csv`: Contains robust meta-analytic-predictive prior results for the oral care dataset used in the Shiny app.
     - `rsconnect/shinyapps.io/3vxc23-naman-agrawal/RIPS_app.dcf`: Configuration file for deploying the Shiny app to shinyapps.io.
-    - `sample_generated_data.xlsx`: Sample generated data file for testing the Shiny app.
+    - `sample_generated_data.xlsx`: Sample generated data file for testing the Oral Care Shiny app.
+    - `sample_data_fc_current.csv`, `sample_data_fc_hist.csv`: Sample generated data file for testing the Face Cream Shiny app.
 
 - `old` Directory
     - Contains older versions of files which may be referred to for historical context or past attempts.

@@ -215,5 +215,6 @@ generate_result_ui_FC <- function(method_name, bayesian_probs1, bayesian_probs2)
   })
 }
 
-
+df = data.frame(yh = rnorm(72, 5.45, sd = 0.8230286))
+write.csv(df, "sample_data_fc_hist.csv", row.names = F)
 
