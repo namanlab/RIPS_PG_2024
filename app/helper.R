@@ -185,19 +185,35 @@ compute_bayesian_probs_FC <- function(Xc, Zc, xc, xh, N) {
   )
 }
 
-generate_result_ui_FC <- function(method_name, bayesian_probs) {
-  # Generate UI elements for each Bayesian probability result
-  lapply(seq_along(bayesian_probs), function(i) {
+compute_bayesian_probs_FC_nohist <- function(Xc, Zc, xc, xh, N) {
+  list(
+    elastic = compute_fc_elastic_nohist(Xc, Zc, xc, xh, N)
+  )
+}
+
+
+generate_result_ui_FC <- function(method_name, bayesian_probs1, bayesian_probs2) {
+  # Generate UI elements for each Bayesian probability result for both sets
+  lapply(seq_along(bayesian_probs1), function(i) {
     withMathJax(HTML(paste0(
       "\n\n\n",
-      "<p><strong>", method_name, " (Treatment ", i, "):</strong></p>",
+      "<div style='display: flex;'>",
+      "<div style='margin-right: 50px;'>",
+      "<p><strong>", method_name, " (Treatment ", i, " - With Historical):</strong></p>",
       "<p>Hypothesis: \\(\\mu_c = \\mu_t \\) vs \\(\\mu_c \\neq \\mu_t\\)</p>",
-      "<p>Bayesian Probability of Rejection: ", format(bayesian_probs[[i]], digits = 4), "</p>",
-      "<p>Result: ", ifelse(bayesian_probs[[i]][1] >= 1 - 0.05, "Reject", "Fail to Reject"), "</p>"
+      "<p>Bayesian Probability of Rejection: ", format(bayesian_probs1[[i]], digits = 4), "</p>",
+      "<p>Result: ", ifelse(bayesian_probs1[[i]][1] >= 1 - 0.05, "Reject", "Fail to Reject"), "</p>",
+      "</div>",
+      "<div>",
+      "<p><strong>", method_name, " (Treatment ", i, " - Without Historical):</strong></p>",
+      "<p>Hypothesis: \\(\\mu_c = \\mu_t \\) vs \\(\\mu_c \\neq \\mu_t\\)</p>",
+      "<p>Bayesian Probability of Rejection: ", format(bayesian_probs2[[i]], digits = 4), "</p>",
+      "<p>Result: ", ifelse(bayesian_probs2[[i]][1] >= 1 - 0.05, "Reject", "Fail to Reject"), "</p>",
+      "</div>",
+      "</div>"
     )))
   })
 }
-
 
 
 

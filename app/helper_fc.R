@@ -168,3 +168,75 @@ compute_fc_elastic <- function(Xc, Zc, xc, xh, N) {
   return(res)
 }
 
+
+
+# --------------- NO_HISTORICAL_DATA_RESULTS
+# Define the Bayesian hypothesis testing functions
+compute_fc_elastic_nohist <- function(Xc, Zc, xc, xh, N) {
+  
+  nh <- length(xh)
+  pc <- ncol(Xc)
+  nc <- ncol(Zc)
+  
+  res_inter <- get_control_prost_nohist(Xc, Zc, xc, xh, nc, nh, N, pc)
+  muc <- res_inter$prost_samples
+  
+  res <- list()
+  for (i in 1:(pc - 1)){
+    curv = mean(muc[,i] <= muc[,pc])
+    curv = max(curv, 1 - curv) # 2 sided
+    res[[i]] = curv
+  }
+  print(res)
+  return(res)
+}
+
+
+get_control_prost_nohist <- function(Xc, Zc, xc, xh, nc, nh, N, pc) {
+  
+  xcc <- xc[which(Xc[,pc] == 1)]
+  ncc <- length(xcc)
+  gt <- getGT(xcc, xh, ncc, nh, N, pc)
+  
+  # Logit and inverse logit functions
+  logit <- function(p) log(p / (1 - p))
+  inv_logit <- function(x) exp(x) / (1 + exp(x))
+  
+  # Define the posterior distribution for control arm using commensurate power prior
+  log_posterior <- function(theta) {
+    mu <- theta[1:pc]
+    sigma2 <- exp(theta[pc + 1])
+    tau2 <- exp(theta[pc + 2])
+    
+    # Likelihood
+    log_lik_current <- dmvnorm(t(xc), mean = Xc %*% mu, sigma = tau2*(Zc %*% t(Zc)) + sigma2*diag(2*nc), log = T)
+    
+    # Prior distributions
+    log_prior_sigma <- -sigma2
+    log_prior_tau <- -tau2
+    
+    jacob_log <- log(sigma2) + log(tau2) 
+    
+    # Posterior
+    log_post <- log_lik_current + log_prior_sigma + log_prior_tau 
+    
+    if (is.na(log_post) || is.nan(log_post) || is.infinite(log_post)) {
+      return(-Inf)  # Return -Inf for invalid log-posterior values
+    }
+    return(log_post)
+  }
+  
+  init_mu <- rep(0, pc)
+  for (i in 1:pc){init_mu[i] <- mean(xc[which(Xc[,i] == 1)])}
+  init_values <- c(init_mu, log(1), log(1))  # Initial values for MCMC sampling
+  # Perform MCMC sampling for posterior
+  samples <<- MCMCmetrop1R(log_posterior, theta.init = init_values, tune = 1,
+                           mcmc = N, burnin = 1000, thin = 1, force.samp = T,
+                           optim.method = "Nelder-Mead")
+  
+  # Extract posterior samples for mu, sigma, a0, theta0, and tau
+  mu_samples <- samples[, 1:pc]
+  sigma2_samples <- exp(samples[, pc + 1])
+  tau2_samples <- inv_logit(samples[, pc + 2])
+  list(prost_samples = mu_samples, ess = gt*nh)
+}

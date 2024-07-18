@@ -179,9 +179,10 @@ server <- function(input, output, session) {
     
     # Compute results for each method
     bayesian_probs <- compute_bayesian_probs_FC(Xc, Zc, xc, xh, input$R_samples)
+    bayesian_probs2 <- compute_bayesian_probs_FC_nohist(Xc, Zc, xc, xh, input$R_samples)
     
     output$results_elastic_FC <- renderUI({
-      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic)
+      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic, bayesian_probs2$elastic)
     })
     
   })
@@ -216,9 +217,10 @@ server <- function(input, output, session) {
     
     # Compute results for each method
     bayesian_probs <- compute_bayesian_probs_FC(Xc, Zc, xc, xh, input$R_samples)
+    bayesian_probs2 <- compute_bayesian_probs_FC_nohist(Xc, Zc, xc, xh, input$R_samples)
     
     output$results_elastic_FC <- renderUI({
-      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic)
+      generate_result_ui_FC("Elastic Method", bayesian_probs$elastic, bayesian_probs2$elastic)
     })
     
   })
