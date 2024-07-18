@@ -149,7 +149,21 @@ generate_result_ui <- function(method_name, bayesian_prob, frequentist_p_value) 
 # Helper function to read data from the uploaded file
 read_data_FC <- function(file1, file2) {
   
-  data <- read_excel(file1)
+  # Helper function to read the file based on extension
+  read_file <- function(file) {
+    ext <- tools::file_ext(file)
+    if (ext == "csv") {
+      return(read_csv(file))
+    } else if (ext == "xlsx" || ext == "xls") {
+      return(read_excel(file))
+    } else {
+      stop("Unsupported file type")
+    }
+  }
+  
+  # Read both files
+  data <- read_file(file1)
+  
   data[[1]] = as.numeric(as.factor(data[[1]]))
   data[[2]] = as.numeric(as.factor(data[[2]]))
   data[[3]] = as.numeric(as.factor(data[[3]]))
@@ -162,7 +176,7 @@ read_data_FC <- function(file1, file2) {
   Zc = gen_Z(nc)
   Xc <- matrix(0, nrow = 2 * nc, ncol = pc)
   xc <- rep(0, 2*nc)
-  for (i in 1:n) {
+  for (i in 1:nc) {
     temp_df <- data %>% filter(ids == i) %>% arrange(sides)
     cur_t <- temp_df %>% pull(treat_grp)
     cur_y <- temp_df %>% pull(y)
@@ -172,7 +186,7 @@ read_data_FC <- function(file1, file2) {
     xc[2*i] <- cur_y[2]
   }
   
-  data_hist <- read_excel(file2)
+  data_hist <- read_file(file2)
   xh <- as.vector(as.matrix(data[, 1:ncol(data_hist)]))
   
   list(Xc = Xc, Zc = Zc, xc = xc, xh = xh)

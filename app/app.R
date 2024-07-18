@@ -335,12 +335,12 @@ server <- function(input, output, session) {
                               "2. Second Column (side): This column should contain either L (left) or R (right) denoting the side of the face from which the sample came.\n\n",
                               "3. Third Column (treatment_grp): This column should contain the treatment id/name (unique identifier for the treatment/control applied on the sample)\n\n",
                               "4. Fourth Column (y): This column should contain the measured value/observation (after adjusting for the baseline).\n\n"),
-                 fileInput("datafile", "Upload Excel File (Current Data)", accept = c(".xlsx"))
+                 fileInput("datafile", "Upload Excel File (Current Data)", accept = c(".xlsx", ".csv"))
         ), 
         tags$div(title=paste0("Data Import Format\n\n",
                               "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
                               "1. Historical Data (yh1, yh2, ... yhn): These columns should contain data for the historical datasets (`yh`). Each column represents a separate historical dataset, with values representing samples from each respective dataset.\n"),
-                 fileInput("datafile_hist", "Upload Excel File (Historical Data)", accept = c(".xlsx"))
+                 fileInput("datafile_hist", "Upload Excel File (Historical Data)", accept = c(".xlsx", ".csv"))
         ),
         actionButton("submit_FC", "Submit")
       )
