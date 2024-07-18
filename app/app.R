@@ -83,6 +83,47 @@ server <- function(input, output, session) {
     })
   })
   
+  
+  observeEvent(input$submit_sim_OC, {
+    req(input$datafile)
+    
+    data <- read_excel(input$datafile$datapath)
+    yc <- data[[1]]
+    yt <- data[[2]]
+    
+    H <- input$H
+    yh_list <- lapply(1:H, function(i) {
+      muh <- input[[paste0("muh_", i)]]
+      sigma2_h <- input[[paste0("sigma2_h_", i)]]
+      nh <- input[[paste0("nh_", i)]]
+      rnorm(nh, muh, sqrt(sigma2_h))
+    })
+    yh <- unlist(yh_list)
+    
+    # Compute results for each method
+    bayesian_probs <- compute_bayesian_probs_OC(yc, yh, yt, input$R_samples)
+    print(bayesian_probs)
+    
+    # Frequentist method
+    frequentist_p_value <- compute_oc_frequentist(yc, yt)
+    
+    output$results_elastic_power_OC <- renderUI({
+      generate_result_ui("Elastic Power Method", bayesian_probs$elastic_power, frequentist_p_value)
+    })
+    output$results_elastic_OC <- renderUI({
+      generate_result_ui("Elastic Method", bayesian_probs$elastic, frequentist_p_value)
+    })
+    output$results_normalized_OC <- renderUI({
+      generate_result_ui("Normalized Power Method", bayesian_probs$normalized, frequentist_p_value)
+    })
+    output$results_commensurate_OC <- renderUI({
+      generate_result_ui("Commensurate Power Method", bayesian_probs$commensurate, frequentist_p_value)
+    })
+    output$results_robust_map_OC <- renderUI({
+      generate_result_ui("Robust MAP Method", bayesian_probs$robust_map, frequentist_p_value)
+    })
+  })
+  
   observeEvent(input$simulate_OC, {
     muc <- input$muc
     mut <- input$mut
@@ -99,11 +140,8 @@ server <- function(input, output, session) {
       rnorm(nh, muh, sqrt(sigma2_h))
     })
     yc <- rnorm(nc, muc, sqrt(sigma2_c))
-    print(yc)
     yt <- rnorm(nt, mut, sqrt(sigma2_t))
-    print(yt)
     yh <- unlist(yh_list)
-    print(yh)
     
     # Compute results for each method
     bayesian_probs <- compute_bayesian_probs_OC(yc, yh, yt, input$R_samples)
@@ -200,7 +238,7 @@ server <- function(input, output, session) {
       )
     } else {
       sidebarMenu(
-        selectInput("anal_type", "Use:", choices = c("Power Analysis", "Import Data", "Run Simulation")),
+        selectInput("anal_type", "Use:", choices = c("Power Analysis", "Import All Data", "Run Simulation", "Import Current Data")),
         uiOutput("dynamic_sidebar_sub_oc")
       )
     }
@@ -216,7 +254,7 @@ server <- function(input, output, session) {
         sliderInput("delta2", "Select delta2:", min = 0, max = 0.2, value = 0.1, step = 0.02),
         selectInput("var", "Select Variable:", choices = c("Pow1", "Pow2", "PESS"))
       )
-    } else if (input$anal_type == "Import Data") {
+    } else if (input$anal_type == "Import All Data") {
       sidebarMenu(
         numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
         tags$div(title=paste0("Data Import Format\n\n",
@@ -227,6 +265,19 @@ server <- function(input, output, session) {
           fileInput("datafile", "Upload Excel File", accept = c(".xlsx"))
         ),
         actionButton("submit_OC", "Submit")
+      )
+    } else if (input$anal_type == "Import Current Data") {
+      sidebarMenu(
+        numericInput("R_samples", "No. of Samples from Prosterior Distr.", value = 10000),
+        tags$div(title=paste0("Data Import Format\n\n",
+                              "When uploading an Excel file, please ensure the data is organized in the following format:\n\n",
+                              "1. First Column (yc): This column should contain the data for the control group (`yc`). Each value represents a sample from the control group.\n\n",
+                              "2. Second Column (yt): This column should contain the data for the treatment group (`yt`). Each value represents a sample from the treatment group.\n\n"),
+                 fileInput("datafile", "Upload Excel File", accept = c(".xlsx"))
+        ),
+        numericInput("H", "Number of historical datasets", value = 1, min = 1),
+        uiOutput("historical_data_inputs"),
+        actionButton("submit_sim_OC", "Submit & Simulate Historical")
       )
     } else {
       sidebarMenu(
